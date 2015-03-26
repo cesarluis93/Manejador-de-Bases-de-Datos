@@ -20,4 +20,36 @@
 		<nature>org.eclipse.jdt.core.javanature</nature>
 		<nature>org.eclipse.xtext.ui.shared.xtextNature</nature>
 	</natures>
+	<linkedResources>
+		<link>
+			<name>src/antlrFiles/SQL.tokens</name>
+			<type>1</type>
+			<locationURI>PROJECT_LOC/target/generated-sources/antlr4/antlrFiles/SQL.tokens</locationURI>
+		</link>
+		<link>
+			<name>src/antlrFiles/SQLBaseListener.java</name>
+			<type>1</type>
+			<locationURI>PROJECT_LOC/target/generated-sources/antlr4/antlrFiles/SQLBaseListener.java</locationURI>
+		</link>
+		<link>
+			<name>src/antlrFiles/SQLLexer.java</name>
+			<type>1</type>
+			<locationURI>PROJECT_LOC/target/generated-sources/antlr4/antlrFiles/SQLLexer.java</locationURI>
+		</link>
+		<link>
+			<name>src/antlrFiles/SQLLexer.tokens</name>
+			<type>1</type>
+			<locationURI>PROJECT_LOC/target/generated-sources/antlr4/antlrFiles/SQLLexer.tokens</locationURI>
+		</link>
+		<link>
+			<name>src/antlrFiles/SQLListener.java</name>
+			<type>1</type>
+			<locationURI>PROJECT_LOC/target/generated-sources/antlr4/antlrFiles/SQLListener.java</locationURI>
+		</link>
+		<link>
+			<name>src/antlrFiles/SQLParser.java</name>
+			<type>1</type>
+			<locationURI>PROJECT_LOC/target/generated-sources/antlr4/antlrFiles/SQLParser.java</locationURI>
+		</link>
+	</linkedResources>
 </projectDescription>
