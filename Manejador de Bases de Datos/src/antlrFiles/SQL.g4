@@ -2,7 +2,11 @@ grammar SQL;
 //**************************************************************
 
 ID	: [a-zA-Z][a-zA-Z | 0-9];
+CHARR :	['\''][a-z|A-Z]['\''] ;
 COMMENT	: '-''-' ~[\r\n]* -> skip ;
+TRUE :	('t'|'T')('r'|'R')('u'|'U')('e'|'E');
+FALSE :	('f'|'F')('a'|'A')('l'|'L')('s'|'S')('e'|'E');
+NUM: [0-9][0-9]* ;
 
 //DDL-----------
 CREATEDB	: ('c'|'C')('r'|'R')('e'|'E')('a'|'A')('t'|'T')('e'|'E')(' ')('d'|'D')('a'|'A')('t'|'T')('a'|'A')('b'|'B')('a'|'A')('s'|'S')('e'|'E');
@@ -42,6 +46,7 @@ DROPTABLE	: ('d'|'D')('r'|'R')('o'|'O')('p'|'P')(' ')('t'|'T')('a'|'A')('b'|'B')
 SHOWTABLE	: ('s'|'S')('h'|'H')('o'|'O')('w'|'W')(' ')('t'|'T')('a'|'A')('b'|'B')('l'|'L')('e'|'E')('s'|'S');
 SHOWCOLFROM	: ('s'|'S')('h'|'H')('o'|'O')('w'|'W')(' ')('c'|'C')('o'|'O')('l'|'L')('u'|'U')('m'|'M')('n'|'n')('s'|'S')(' ')('f'|'F')('r'|'R')('o'|'O')('m'|'M');
 
+
 ddlDeclaration	: (ddlInstruction ';')+ ;
 ddlInstruction	: CREATEDB ID 
 				| ALTERDB ID RENAMETO ID
@@ -61,7 +66,7 @@ constraints	: constraint | (constraint ',')+ constraint ;
 constraint	: CONSTRAINT c;
 c	: ('PK_')ID PRIMARYK (ids)* 
 	| ('FK_')ID FOREIGNK (ids)* REFERENCES ID/*de una tabla*/ (ids)* 
-	| ('CH_')ID CHECK '(' exp/*exp booleana*/ ')'
+	| ('CH_')ID CHECK '(' expression/*exp booleana*/ ')'
 	;
 
 ids	: ID | (ID ',')+ ID ; 
@@ -70,20 +75,106 @@ action 		: ADDCOL ID TYPE (constraints)*
 			| DROPCOL ID
 			| DROPCONST ID/*nombre*/'_'ID/*constrin*/
 			;
-exp	: 'blah' ;
+
+expression : andExpr	#simpleExpression
+		   | expression or_op andExpr	#doubleExpression
+		   ;
+
+andExpr : eqExpr	#simpleAndExpression
+	   | andExpr and_op eqExpr	#doubleAndExpression 
+	   ;
+
+eqExpr : relationExpr	#simpleEqExpression 
+	  | eqExpr eq_op relationExpr	#doubleEqExpression
+	  ;
+
+relationExpr : addExpr	#simpleRelationExpression
+			| relationExpr rel_op addExpr	#doubleRelationExpression 
+			;
+addExpr: multExpr	#simpleAddExpression
+	   | addExpr add_op multExpr	#doubleAddExpression
+	   ;
+
+multExpr: unaryExpr	#simpleMultExpression
+		| multExpr mult_op unaryExpr	#doubleMultExpression 
+		;
+
+unaryExpr:  '('(INT|CHARR)')'  value #castedUnary
+		 | '-' value	#negativeUnary
+		 | '!' value 	#negationUnary
+		 | value  		#simpleUnary
+		 ; 
+
+value	: ID	
+		| literal 	
+		;
+		
+literal	: int_literal	
+		| char_literal	
+		| bool_literal 	
+		;
+
+int_literal	: NUM ;
+
+char_literal	: CHARR ;
+
+bool_literal	: TRUE | FALSE ;
+		
+or_op :	('o'|'O')('r'|'R');
+and_op :	('a'|'A')('n'|'N')('d'|'D');
+eq_op :	'=' | '<>';
+rel_op	: '<' | '>' | '<=' | '>=' ;	
+add_op	: '+' | '-' ;
+mult_op	: '*' | '/' | '%' ;
+
 //DDL-----------
 
 //DML-----------
 //faltan estas producciones
+INTEGER :	[0-9]+;
+FLOATNUM :	[0-9]+'.'[0-9]+;
+DATED :	'\''[0-9][0-9][0-9][0-9]'-'[0-9][0-9]'-'[0-9][0-9]'\'';
+CHARACTER :	'\''[a-zA-Z]*'\'';
+INSERT : 	('i'|'I')('n'|'N')('s'|'S')('e'|'E')('r'|'R')('t'|'T');
+VALUES :	('v'|'V')('a'|'A')('l'|'L')('u'|'U')('e'|'E')('s'|'S');
+UPDATE :	('u'|'U')('p'|'P')('d'|'D')('a'|'A')('t'|'T')('e'|'E');
+SET :		('s'|'S')('e'|'E')('t'|'T');
+WHERE :		('w'|'W')('h'|'H')('e'|'E')('r'|'R')('e'|'E');
+DELETE :	('d'|'D')('e'|'E')('l'|'L')('e'|'E')('t'|'T')('e'|'E');
+SELECT :	('s'|'S')('e'|'E')('l'|'L')('e'|'E')('c'|'C')('t'|'T');
+FROM :		('f'|'F')('r'|'R')('o'|'O')('m'|'M');
+ORDERBY :	('o'|'O')('r'|'R')('d'|'D')('e'|'E')('r'|'R')(' ')('b'|'B')('y'|'Y');
+ASC : 		('a'|'A')('s'|'S')('c'|'C');
+DESC :		('d'|'D')('e'|'E')('s'|'S')('c'|'C');
+
+dmlDeclaration :	(dmlInstruction)+ ;
+
+dmlInstruction  :	inserts
+				| 	UPDATE ID SET asignaciones WHERE condition ';'
+				| 	DELETE ID WHERE condition ';'
+				|	SELECT sel FROM ID WHERE conditions ORDERBY ords ';'
+				;
+
+inserts : 	(INSERT ID '(' (columnas)* ')' VALUES '(' (valores)* ')'';')+;
+valores :	(valor | (valor ',')+ valor);
+valor :	(INTEGER | FLOATNUM | DATED | CHARACTER);
+
+asignaciones :	asignacion | (asignacion ',')+ asignacion;
+asignacion :	ID '=' valor ;
+
+conditions 	:	condition | (condition (AND | OR)) condition; 
+condition :		ID (eq_op | rel_op) valor	;
+
+sel : '*' 
+	| columnas  
+	;
+ords : 	ord | (ord ',')+ ord ;
+ord :	expression (ASC | DESC)? ;
+
 
 //DML-----------
 
 DIGIT	: [0-9];
 LOWERLETTER	: [a-z];
+
 UPPERLETTER	: [A-Z];
-
-
-// Yo soy Cesar...  ..l.
-
-//**************************************************************
- 
