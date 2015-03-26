@@ -178,3 +178,10 @@ DIGIT	: [0-9];
 LOWERLETTER	: [a-z];
 
 UPPERLETTER	: [A-Z];
+
+//gramatica terminada
+
+
+
+
+
