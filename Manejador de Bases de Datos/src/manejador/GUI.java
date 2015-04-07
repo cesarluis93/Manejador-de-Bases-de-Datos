@@ -69,7 +69,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 
-public class GUI1 extends JFrame {
+public class GUI extends JFrame {
 
 	private JPanel contentPane;
 
@@ -80,7 +80,7 @@ public class GUI1 extends JFrame {
 		EventQueue.invokeLater(new Runnable() {
 			public void run() {
 				try {
-					GUI1 frame = new GUI1();
+					GUI frame = new GUI();
 					frame.setVisible(true);
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -92,7 +92,7 @@ public class GUI1 extends JFrame {
 	/**
 	 * Create the frame.
 	 */
-	public GUI1() {
+	public GUI() {
 		final JPanel panelTools = new JPanel();
 		final JScrollPane scrollPaneTree = new JScrollPane();
 		final JTree treeWorkSpace = new JTree();
@@ -188,7 +188,7 @@ public class GUI1 extends JFrame {
 		
 		JPanel panel = new JPanel();
 		panelWorkspace.add(panel, BorderLayout.SOUTH);
-		scrollPaneEditor.setRowHeaderView(lineas);
+		//scrollPaneEditor.setRowHeaderView(lineas);
 		
 
 		panelWorkspace2.setPreferredSize(new Dimension(10, 150));

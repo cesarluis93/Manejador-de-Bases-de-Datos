@@ -4,3 +4,5 @@
 /SQLLexer.tokens
 /SQLListener.java
 /SQLParser.java
+/SQLVisitor.java
+/SQLBaseVisitor.java

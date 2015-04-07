@@ -32,6 +32,11 @@
 			<locationURI>PROJECT_LOC/target/generated-sources/antlr4/antlrFiles/SQLBaseListener.java</locationURI>
 		</link>
 		<link>
+			<name>src/antlrFiles/SQLBaseVisitor.java</name>
+			<type>1</type>
+			<locationURI>PROJECT_LOC/target/generated-sources/antlr4/antlrFiles/SQLBaseVisitor.java</locationURI>
+		</link>
+		<link>
 			<name>src/antlrFiles/SQLLexer.java</name>
 			<type>1</type>
 			<locationURI>PROJECT_LOC/target/generated-sources/antlr4/antlrFiles/SQLLexer.java</locationURI>
@@ -50,6 +55,11 @@
 			<name>src/antlrFiles/SQLParser.java</name>
 			<type>1</type>
 			<locationURI>PROJECT_LOC/target/generated-sources/antlr4/antlrFiles/SQLParser.java</locationURI>
+		</link>
+		<link>
+			<name>src/antlrFiles/SQLVisitor.java</name>
+			<type>1</type>
+			<locationURI>PROJECT_LOC/target/generated-sources/antlr4/antlrFiles/SQLVisitor.java</locationURI>
 		</link>
 	</linkedResources>
 </projectDescription>
