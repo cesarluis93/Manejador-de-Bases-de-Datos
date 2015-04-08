@@ -52,6 +52,9 @@ import java.awt.CardLayout;
 import java.awt.GridBagLayout;
 import java.awt.GridBagConstraints;
 
+import antlrFiles.SQLLexer;
+import antlrFiles.SQLParser;
+
 import com.jgoodies.forms.layout.FormLayout;
 import com.jgoodies.forms.layout.ColumnSpec;
 import com.jgoodies.forms.layout.RowSpec;
@@ -62,12 +65,19 @@ import javax.swing.GroupLayout;
 import javax.swing.GroupLayout.Alignment;
 import javax.swing.LayoutStyle.ComponentPlacement;
 
+import org.antlr.v4.runtime.ANTLRInputStream;
+import org.antlr.v4.runtime.CommonTokenStream;
+
 import java.awt.event.ActionListener;
 import java.awt.event.ActionEvent;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 
 public class GUI extends JFrame {
 
@@ -100,9 +110,12 @@ public class GUI extends JFrame {
 		final JPanel panelEditor = new JPanel();
 		final JScrollPane scrollPaneEditor = new JScrollPane();
 		final JTextArea textAreaEditor = new JTextArea();
+		final JButton btnCompile = new JButton("Compile");
 		final JPanel panelWorkspace2 = new JPanel();
+		final JScrollPane scrollPaneConsole = new JScrollPane();
+		final JTextArea textAreaConsole = new JTextArea();
 		
-		
+		setExtendedState(JFrame.MAXIMIZED_BOTH);
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		setBounds(100, 100, 450, 300);
 		contentPane = new JPanel();
@@ -172,7 +185,15 @@ public class GUI extends JFrame {
 			}
 		});
 		scrollPaneTree.setViewportView(treeWorkSpace);
-				
+		
+		textAreaEditor.addKeyListener(new KeyAdapter() {	
+			@Override
+			public void keyReleased(KeyEvent e) {
+				if (e.getKeyCode()==KeyEvent.VK_F5){
+					btnCompile.doClick();
+				}
+			}
+		});
 
 		panelWorkspace.setBackground(Color.GRAY);
 		panelWorkspace.setPreferredSize(new Dimension(250, 10));
@@ -188,7 +209,7 @@ public class GUI extends JFrame {
 		
 		JPanel panel = new JPanel();
 		panelWorkspace.add(panel, BorderLayout.SOUTH);
-		//scrollPaneEditor.setRowHeaderView(lineas);
+		scrollPaneEditor.setRowHeaderView(lineas);
 		
 
 		panelWorkspace2.setPreferredSize(new Dimension(10, 150));
@@ -198,8 +219,42 @@ public class GUI extends JFrame {
 		JPanel panelBotones = new JPanel();
 		panelBotones.setPreferredSize(new Dimension(10, 50));
 		panelWorkspace2.add(panelBotones, BorderLayout.NORTH);
-		
-		JButton btnCompile = new JButton("Compile");
+				
+		btnCompile.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				SQLErrorListener.errorMsg = "";
+				textAreaConsole.setText("");
+				textAreaConsole.setForeground(new Color(255,0,0));
+				
+				String userCode = textAreaEditor.getText();
+				
+				// create a CharStream that reads from standard input
+				ANTLRInputStream input = new ANTLRInputStream(userCode);
+				// create a lexer that feeds off of input CharStream
+				SQLLexer lexer = new SQLLexer(input);
+				// create a buffer of tokens pulled from the lexer
+				CommonTokenStream tokens = new CommonTokenStream(lexer);
+				// create a parser that feeds off the tokens buffer
+				SQLParser parser = new SQLParser(tokens);
+				
+				parser.removeErrorListeners(); // remove ConsoleErrorListener
+				parser.addErrorListener(new SQLErrorListener()); // add ours
+								
+				//ParseTree tree = parser.program();
+				//parser.reset();
+				parser.start().inspect(parser);
+				
+				// Parsing result.
+				String consoleResult = SQLErrorListener.errorMsg;
+				if (consoleResult.equals("")){
+					textAreaConsole.setForeground(new Color(0,0,0));
+					consoleResult = "Program successfully parsed ..!";
+				}
+				textAreaConsole.setText(consoleResult);
+				
+				
+			}
+		});
 		btnCompile.setSize(new Dimension(100, 0));
 		
 		JButton btnLoadFile = new JButton("Load File");
@@ -251,9 +306,8 @@ public class GUI extends JFrame {
 		JPanel panelConsole = new JPanel();
 		panelWorkspace2.add(panelConsole, BorderLayout.CENTER);
 		panelConsole.setLayout(new BorderLayout(0, 0));
-		final JScrollPane scrollPaneConsole = new JScrollPane();
 		panelConsole.add(scrollPaneConsole);
-		final JTextArea textAreaConsole = new JTextArea();
+		textAreaConsole.setForeground(new Color(255,0,0));
 		scrollPaneConsole.setViewportView(textAreaConsole);
 		
 	}
