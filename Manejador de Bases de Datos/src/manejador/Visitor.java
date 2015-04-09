@@ -134,19 +134,19 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			JSONObject dataJson;
 			try {
 				dataJson = new JSONObject(data);
-				JSONObject newDB = new JSONObject("{\"name\":\"" + dataBaseName + "\",\"numTables\":\"" + 0 + "\"}");				
-				dataJson.getJSONArray("databases").put(newDB);				
+				JSONObject newDB = new JSONObject("{\"name\":\"" + dataBaseName + "\",\"numTables\":" + 0 + "}");				
+				dataJson.getJSONArray("databases").put(newDB);
 			} catch (JSONException e) {
 				// TODO Auto-generated catch block
-				SQLErrorListener.errorMsg += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE DATABASE statement. Could not complete the json instruction.";
+				GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE DATABASE statement. Could not complete the json instruction.";
 				return "error";
 			}
 			myTools.writeFile(masterDatabase, dataJson.toString());
-			//System.out.println(myTools.convertToContentJsonView(dataJson.toString()));
+			GUI.msgConfirm += "CREATE DATABASE query returned successfully.\n";
 			return "void";
 		}
 		else{
-			SQLErrorListener.errorMsg += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE DATABASE statement. There is already a database with the same name.";
+			GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE DATABASE statement. There is already a database with the same name.";
 			return "error";
 		}
 		
@@ -170,19 +170,21 @@ public class Visitor extends SQLBaseVisitor<Object> {
 				if (database.getString("name").equals(name)){
 					dbFound = true;
 					database.put("name", newName);
+					break;
 				}
 			}
 			if (!dbFound){
-				SQLErrorListener.errorMsg += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in RENAME DATABASE statement. Referenced database does not exist.";
+				GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in RENAME DATABASE statement. Referenced database does not exist.";
 				return "error";				
 			}
 			
 			myTools.writeFile(masterDatabase, dataJson.toString());
+			GUI.msgConfirm += "RENAME DATABASE query returned successfully.\n";
 			return "void";
 			
 		} catch (JSONException e) {
 			// TODO Auto-generated catch block
-			SQLErrorListener.errorMsg += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in RENAME DATABASE statement. Could not complete the json instruction.";
+			GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in RENAME DATABASE statement. Could not complete the json instruction.";
 			return "error";
 		}
 	}
@@ -201,31 +203,32 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			dataJson = new JSONObject(data);
 			JSONArray databases = dataJson.getJSONArray("databases");
 			for (int i=0; i<databases.length(); i++){
-				JSONObject database = (JSONObject) databases.get(i);				
+				JSONObject database = (JSONObject) databases.get(i);
 				if (database.getString("name").equals(name)){
 					dbFound = true;
-					String msgConfirm = "¿Borrar base de datos " + name + " con N registros?";
+					String msgConfirm = "¿Borrar base de datos " + name + " con " + database.getInt("numTables")+ " registros?";
 					int option = JOptionPane.showConfirmDialog(null, msgConfirm);
 			        if(option == JOptionPane.YES_OPTION){
 			        	databases.remove(i);
 			        	folder.delete();
-			        	JOptionPane.showMessageDialog(null, "Database successfully deleted..!");
+			        	break;
 			        }
-			        else
-			        	return "void";
+			        GUI.msgConfirm += "DROP DATABASE query canceled.\n";
+		        	return "void";
 				}
 			}
 			if (!dbFound){
-				SQLErrorListener.errorMsg += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in DROP DATABASE statement. Referenced database does not exist.";
+				GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in DROP DATABASE statement. Referenced database does not exist.";
 				return "error";				
 			}
 			
 			myTools.writeFile(masterDatabase, dataJson.toString());
+			GUI.msgConfirm += "DROP DATABASE query returned successfully.\n";
 			return "void";
 			
 		} catch (JSONException e) {
 			// TODO Auto-generated catch block
-			SQLErrorListener.errorMsg += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in DROP DATABASE statement. Could not complete the json instruction.";
+			GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in DROP DATABASE statement. Could not complete the json instruction.";
 			return "error";
 		}
 	}
@@ -242,11 +245,11 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			dataJson = new JSONObject(data);
 		} catch (JSONException e) {
 			// TODO Auto-generated catch block
-			SQLErrorListener.errorMsg += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in SHOW DATABASES statement. Could not complete the json instruction.";
+			GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in SHOW DATABASES statement. Could not complete the json instruction.";
 			return "error";
 		}
 		String dataView = myTools.convertToContentJsonView(dataJson.toString());
-		SQLErrorListener.errorMsg = dataView;
+		GUI.msgConfirm = dataView;
 		
 		return "void";
 	}

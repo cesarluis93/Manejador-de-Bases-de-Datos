@@ -6,7 +6,6 @@ import java.util.List;
 import org.antlr.v4.runtime.*;
 
 public class SQLErrorListener extends BaseErrorListener{
-	public static String errorMsg;
 	
 	@Override	
 	public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol, int line, int charPositionInLine, String msg, RecognitionException e) {
@@ -14,8 +13,8 @@ public class SQLErrorListener extends BaseErrorListener{
 		List<String> stack = ((Parser)recognizer).getRuleInvocationStack();
 		Collections.reverse(stack);
 		
-		errorMsg += "rule stack: [" + stack + "]" + "\n";
-		errorMsg += "line " + line + ":" + charPositionInLine + " at " + offendingSymbol + ": " + msg + "\n\n";
+		GUI.msgError += "rule stack: [" + stack + "]" + "\n";
+		GUI.msgError += "line " + line + ":" + charPositionInLine + " at " + offendingSymbol + ": " + msg + "\n\n";
 		
 		String errorMsgConsole = "line " + line + ":" + charPositionInLine + " " + msg + "\n";
 		errorMsgConsole += this.underlineError(recognizer, (Token)offendingSymbol, line, charPositionInLine);

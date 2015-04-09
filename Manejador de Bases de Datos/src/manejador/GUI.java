@@ -6,7 +6,6 @@ import java.awt.EventQueue;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
-
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 import javax.swing.JTextArea;
@@ -19,7 +18,6 @@ import javax.swing.JTree;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.TreePath;
-
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.JButton;
@@ -43,8 +41,12 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.awt.Font;
 
 public class GUI extends JFrame {
+	
+	static String msgConfirm = "";
+	static String msgError = "";
 
 	private JPanel contentPane;
 
@@ -75,10 +77,14 @@ public class GUI extends JFrame {
 		final JPanel panelEditor = new JPanel();
 		final JScrollPane scrollPaneEditor = new JScrollPane();
 		final JTextArea textAreaEditor = new JTextArea();
+		textAreaEditor.setFont(new Font("Consolas", Font.PLAIN, 12));
+		textAreaEditor.setTabSize(4);
 		final JButton btnCompile = new JButton("Compile");
 		final JPanel panelWorkspace2 = new JPanel();
 		final JScrollPane scrollPaneConsole = new JScrollPane();
 		final JTextArea textAreaConsole = new JTextArea();
+		textAreaConsole.setFont(new Font("Consolas", Font.PLAIN, 12));
+		textAreaConsole.setTabSize(4);
 		
 		setExtendedState(JFrame.MAXIMIZED_BOTH);
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -184,14 +190,15 @@ public class GUI extends JFrame {
 				
 		btnCompile.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
-				SQLErrorListener.errorMsg = "";
+				GUI.msgError = "";
+				GUI.msgConfirm = "";
 				textAreaConsole.setText("");
 				textAreaConsole.setForeground(new Color(255,0,0));
 				
 				String userCode = textAreaEditor.getSelectedText();				
 				if (userCode == null){
-					SQLErrorListener.errorMsg = "Error: Impossible to process. Select query to execute.";
-					textAreaConsole.setText(SQLErrorListener.errorMsg);
+					GUI.msgError = "Error: Impossible to process. Select query to execute.";
+					textAreaConsole.setText(GUI.msgError);
 					return;
 				}
 				
@@ -213,22 +220,23 @@ public class GUI extends JFrame {
 				//parser.start().inspect(parser);
 				
 				// Result of parsing
-				String consoleResult = SQLErrorListener.errorMsg;
+				String consoleResult = GUI.msgError;
 				
 				// ********** ANALISIS SEMANTICO **********
 				
 				if (consoleResult.equals("")){
 					System.out.println("Ningún error sintáctico encontrado...!!!");
-					parser.reset();
+					parser.reset();					
 					//ParseTree tree = parser.start();
 					Visitor myVisitor = new Visitor();					
 					myVisitor.visit(tree);
-					consoleResult = SQLErrorListener.errorMsg;
+					consoleResult = GUI.msgError;
 				}
 								
-				if (consoleResult.equals(""))
+				if (consoleResult.equals("")){
 					textAreaConsole.setForeground(new Color(0,0,0));
-				
+					consoleResult = GUI.msgConfirm;
+				}				
 				
 				textAreaConsole.setText(consoleResult.equals("")? "Program successfully parsed..!":consoleResult);				
 				
