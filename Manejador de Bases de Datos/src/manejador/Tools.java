@@ -10,32 +10,78 @@ import java.io.OutputStreamWriter;
 public class Tools {
 	public Tools(){}
 	
-	public String LeerFichero(File file){
+	/**
+	 * Metodo para leer un archivo.
+	 * @param file
+	 * @return
+	 */
+	public String readFile(File file){
 		String data = "";
 		try {
-			BufferedReader Flee= new BufferedReader(new FileReader(file));  
-			String Slinea;
-			while((Slinea = Flee.readLine())!=null) {  
-				data += Slinea;
+			BufferedReader reader= new BufferedReader(new FileReader(file));  
+			String line;
+			while((line = reader.readLine())!=null) {  
+				data += line + " ";
 			}
-			Flee.close();				
+			reader.close();
 		} catch (Exception ex) {
 			System.out.println(ex.getMessage());  
 		}
 		return data;
-	 }
+	}
 	
-	public static void EcribirFichero(File Ffichero,String SCadena){  
+	/**
+	 * Metodo para escribir un archivo.
+	 * @param file
+	 * @param text
+	 * @return
+	 */
+	public boolean writeFile(File file,String text){  
 	  try {
-		  BufferedWriter Fescribe=new BufferedWriter(new OutputStreamWriter(new FileOutputStream(Ffichero,true), "utf-8"));  
-		  /*Escribe en el fichero la cadena que recibe la función.  
-		   *el string "\r\n" significa salto de linea*/  
-		  Fescribe.write(SCadena + "\r\n");  
-		  //Cierra el flujo de escritura  
-  Fescribe.close();  
+		  BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file), "utf-8"));
+		  writer.write(text);
+		  writer.close();
+		  return true;
 	   } catch (Exception ex) {  
-	      //Captura un posible error le imprime en pantalla   
-	          System.out.println(ex.getMessage());  
-	       }   
-	}  	
+		   //Captura un posible error le imprime en pantalla   
+		   System.out.println(ex.getMessage());
+		   return false;
+	   }
+	}
+	
+	/**
+	 * Metodo para visualizar un archivo .json con tabulaciones.
+	 * @param data
+	 * @return
+	 */
+	public String convertToContentJsonView(String data){
+		String toshow = "", tabs;
+		int numTabs = 0;
+		for (int i=0; i<data.length(); i++){			
+			if ("{[".contains(String.valueOf(data.charAt(i)))){
+				numTabs += 1;
+				tabs = "";
+				for (int j=0; j<numTabs; j++)
+					tabs += "\t";
+				toshow += String.valueOf(data.charAt(i)) + "\n" + tabs;				
+			}
+			else if ("]}".contains(String.valueOf(data.charAt(i)))){
+				numTabs -= 1;
+				tabs = "";
+				for (int j=0; j<numTabs; j++)
+					tabs += "\t";
+				toshow += "\n" + tabs + String.valueOf(data.charAt(i));
+			}
+			else if (data.charAt(i) == ','){
+				tabs = "";
+				for (int j=0; j<numTabs; j++)
+					tabs += "\t";
+				toshow += String.valueOf(data.charAt(i)) + "\n" + tabs;
+			}
+			else {
+				toshow += String.valueOf(data.charAt(i));	
+			}			
+		}			
+		return toshow;
+	}
 }

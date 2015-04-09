@@ -125,24 +125,26 @@ public class Visitor extends SQLBaseVisitor<Object> {
 		// TODO Auto-generated method stub
 		String dataBaseName = ctx.ID().getText();
 		File folder = new File("databases\\" + dataBaseName);
-		File master = new File("databases\\databases.json");
+		File masterDatabase = new File("databases\\databases.json");
 		if (!folder.exists()){
 			folder.mkdir();
-			String data = myTools.LeerFichero(master);
+			String data = myTools.readFile(masterDatabase);			
+			JSONObject dataJson;
 			try {
-				JSONObject dataJson = new JSONObject(data);
-				JSONObject newDB = new JSONObject("{\"name\": " + "\"" + dataBaseName + "\", \"numTables\": " + 0 + "}");
-				dataJson.getJSONArray("databases").put(newDB);
-				
-				
+				dataJson = new JSONObject(data);
+				JSONObject newDB = new JSONObject("{\"name\":\"" + dataBaseName + "\",\"numTables\":\"" + 0 + "\"}");				
+				dataJson.getJSONArray("databases").put(newDB);				
 			} catch (JSONException e) {
 				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}			
+				SQLErrorListener.errorMsg += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE DATABASE statement. Could not complete the json instruction.";
+				return "error";
+			}
+			myTools.writeFile(masterDatabase, dataJson.toString());
+			System.out.println(myTools.convertToContentJsonView(dataJson.toString()));
 			return "void";
 		}
 		else{
-			SQLErrorListener.errorMsg += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. There is already a database with the same name.";
+			SQLErrorListener.errorMsg += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE DATABASE statement. There is already a database with the same name.";
 			return "error";
 		}
 		
