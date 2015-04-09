@@ -140,7 +140,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 				return "error";
 			}
 			myTools.writeFile(masterDatabase, dataJson.toString());
-			System.out.println(myTools.convertToContentJsonView(dataJson.toString()));
+			//System.out.println(myTools.convertToContentJsonView(dataJson.toString()));
 			return "void";
 		}
 		else{
@@ -148,6 +148,42 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			return "error";
 		}
 		
+	}
+	
+	@Override
+	public Object visitAlterDB(AlterDBContext ctx) {
+		// TODO Auto-generated method stub
+		String name = ctx.ID(0).getText();
+		String newName = ctx.ID(1).getText();		
+		File masterDatabase = new File("databases\\databases.json");
+		String data = myTools.readFile(masterDatabase);
+		
+		JSONObject dataJson;
+		boolean dbFound = false;
+		try {
+			dataJson = new JSONObject(data);
+			JSONArray databases = dataJson.getJSONArray("databases");			
+			for (int i=0; i<databases.length(); i++){
+				JSONObject database = (JSONObject) databases.get(i);				
+				if (database.getString("name").equals(name)){
+					dbFound = true;
+					database.put("name", newName);
+				}
+			}
+			if (!dbFound){
+				SQLErrorListener.errorMsg += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in RENAME DATABASE statement. Referenced database does not exist.";
+				return "error";				
+			}
+			
+			myTools.writeFile(masterDatabase, dataJson.toString());
+			return "void";
+			
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			SQLErrorListener.errorMsg += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in RENAME DATABASE statement. Could not complete the json instruction.";
+			return "error";
+		}		
+
 	}
 	
 	@Override
@@ -176,12 +212,6 @@ public class Visitor extends SQLBaseVisitor<Object> {
 
 	@Override
 	public Object visitSelectSome(SelectSomeContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Object visitAlterDB(AlterDBContext ctx) {
 		// TODO Auto-generated method stub
 		return null;
 	}

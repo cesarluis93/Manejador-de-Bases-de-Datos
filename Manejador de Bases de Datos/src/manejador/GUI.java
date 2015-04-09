@@ -191,7 +191,12 @@ public class GUI extends JFrame {
 				textAreaConsole.setText("");
 				textAreaConsole.setForeground(new Color(255,0,0));
 				
-				String userCode = textAreaEditor.getText();
+				String userCode = textAreaEditor.getSelectedText();				
+				if (userCode == null){
+					SQLErrorListener.errorMsg = "Error: Impossible to process. Select query to execute.";
+					textAreaConsole.setText(SQLErrorListener.errorMsg);
+					return;
+				}
 				
 				// create a CharStream that reads from standard input
 				ANTLRInputStream input = new ANTLRInputStream(userCode);
