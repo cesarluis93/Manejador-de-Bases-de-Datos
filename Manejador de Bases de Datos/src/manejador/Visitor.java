@@ -1,11 +1,17 @@
 package manejador;
 
+import java.io.File;
+
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.RuleNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import antlrFiles.SQLBaseVisitor;
+import antlrFiles.SQLParser;
 import antlrFiles.SQLParser.ActionAddColumnContext;
 import antlrFiles.SQLParser.ActionAddConstraintContext;
 import antlrFiles.SQLParser.ActionDropColumnContext;
@@ -42,6 +48,7 @@ import antlrFiles.SQLParser.ShowTablesContext;
 import antlrFiles.SQLParser.SimpleAndExpressionContext;
 import antlrFiles.SQLParser.SimpleEqExpressionContext;
 import antlrFiles.SQLParser.SimpleUnaryContext;
+import antlrFiles.SQLParser.StartContext;
 import antlrFiles.SQLParser.TypeCharContext;
 import antlrFiles.SQLParser.TypeDateContext;
 import antlrFiles.SQLParser.TypeFloatContext;
@@ -51,11 +58,11 @@ import antlrFiles.SQLParser.UseDBContext;
 
 
 public class Visitor extends SQLBaseVisitor<Object> {
-
-	@Override
-	public Object visit(ParseTree arg0) {
-		// TODO Auto-generated method stub
-		return null;
+	
+	Tools myTools;
+	
+	public Visitor(){
+		myTools = new Tools();
 	}
 
 	@Override
@@ -76,12 +83,77 @@ public class Visitor extends SQLBaseVisitor<Object> {
 		return null;
 	}
 
+	
+	
+	
+	
+	
+	public Object visitStart(StartContext ctx){
+		for (int i=0; i<ctx.getChildCount(); i++){
+			Object newDecl = visit(ctx.getChild(i));
+			if (newDecl.equals(null))
+				return "error";
+		}
+			
+		return "void";
+	}
+	
+	@Override
+	public Object visitDdlDeclaration(DdlDeclarationContext ctx) {
+		// TODO Auto-generated method stub		
+		
+		Object newDecl = visit(ctx.ddlInstruction());
+		if (newDecl.equals(null))
+			return "error";
+				
+		return "void";
+	}
+	
+	@Override
+	public Object visitDmlDeclaration(DmlDeclarationContext ctx) {
+		// TODO Auto-generated method stub
+		
+		Object newDecl = visit(ctx.dmlInstruction());
+		if (newDecl.equals(null))
+			return "error";
+	
+		return "void";
+	}
+
+	@Override
+	public Object visitCreateDB(CreateDBContext ctx) {
+		// TODO Auto-generated method stub
+		String dataBaseName = ctx.ID().getText();
+		File folder = new File("databases\\" + dataBaseName);
+		File master = new File("databases\\databases.json");
+		if (!folder.exists()){
+			folder.mkdir();
+			String data = myTools.LeerFichero(master);
+			try {
+				JSONObject dataJson = new JSONObject(data);
+				JSONObject newDB = new JSONObject("{\"name\": " + "\"" + dataBaseName + "\", \"numTables\": " + 0 + "}");
+				dataJson.getJSONArray("databases").put(newDB);
+				
+				
+			} catch (JSONException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}			
+			return "void";
+		}
+		else{
+			SQLErrorListener.errorMsg += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. There is already a database with the same name.";
+			return "error";
+		}
+		
+	}
+	
 	@Override
 	public Object visitTypeDate(TypeDateContext ctx) {
 		// TODO Auto-generated method stub
 		return null;
 	}
-
+	
 	@Override
 	public Object visitShowColumns(ShowColumnsContext ctx) {
 		// TODO Auto-generated method stub
@@ -209,12 +281,6 @@ public class Visitor extends SQLBaseVisitor<Object> {
 	}
 
 	@Override
-	public Object visitDmlDeclaration(DmlDeclarationContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
 	public Object visitTypeInt(TypeIntContext ctx) {
 		// TODO Auto-generated method stub
 		return null;
@@ -240,12 +306,6 @@ public class Visitor extends SQLBaseVisitor<Object> {
 
 	@Override
 	public Object visitCreateTable(CreateTableContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Object visitCreateDB(CreateDBContext ctx) {
 		// TODO Auto-generated method stub
 		return null;
 	}
@@ -304,11 +364,6 @@ public class Visitor extends SQLBaseVisitor<Object> {
 		return null;
 	}
 
-	@Override
-	public Object visitDdlDeclaration(DdlDeclarationContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
 
 	@Override
 	public Object visitNegationUnary(NegationUnaryContext ctx) {

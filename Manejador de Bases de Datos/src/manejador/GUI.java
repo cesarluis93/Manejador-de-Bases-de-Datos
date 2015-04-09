@@ -6,60 +6,26 @@ import java.awt.EventQueue;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
-import javax.swing.JTabbedPane;
 
-import java.awt.GridLayout;
-
-import javax.swing.BoxLayout;
-import javax.swing.JEditorPane;
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 import javax.swing.JTextArea;
 import javax.swing.JScrollPane;
-import javax.swing.JDesktopPane;
-import javax.swing.JLayeredPane;
 
-import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Color;
-import java.awt.FlowLayout;
 
-import javax.swing.JSplitPane;
-
-import java.awt.Rectangle;
-
-import javax.swing.JInternalFrame;
-
-import java.awt.Panel;
-
-import javax.swing.SpringLayout;
 import javax.swing.JTree;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.TreePath;
 
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.event.TreeSelectionEvent;
-import javax.swing.JMenuBar;
-import javax.swing.JMenu;
-import javax.swing.JMenuItem;
 import javax.swing.JButton;
-
-import java.awt.CardLayout;
-import java.awt.GridBagLayout;
-import java.awt.GridBagConstraints;
 
 import antlrFiles.SQLLexer;
 import antlrFiles.SQLParser;
-
-import com.jgoodies.forms.layout.FormLayout;
-import com.jgoodies.forms.layout.ColumnSpec;
-import com.jgoodies.forms.layout.RowSpec;
-
-import net.miginfocom.swing.MigLayout;
 
 import javax.swing.GroupLayout;
 import javax.swing.GroupLayout.Alignment;
@@ -67,6 +33,7 @@ import javax.swing.LayoutStyle.ComponentPlacement;
 
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.tree.ParseTree;
 
 import java.awt.event.ActionListener;
 import java.awt.event.ActionEvent;
@@ -76,8 +43,6 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
 
 public class GUI extends JFrame {
 
@@ -239,19 +204,31 @@ public class GUI extends JFrame {
 				
 				parser.removeErrorListeners(); // remove ConsoleErrorListener
 				parser.addErrorListener(new SQLErrorListener()); // add ours
-								
-				//ParseTree tree = parser.program();
-				//parser.reset();
-				parser.start().inspect(parser);
 				
-				// Parsing result.
+				// ********** ANALISIS SINTACTICO **********
+				
+				ParseTree tree = parser.start();	
+				//parser.start().inspect(parser);
+				
+				// Result of parsing
 				String consoleResult = SQLErrorListener.errorMsg;
-				if (consoleResult.equals("")){
-					textAreaConsole.setForeground(new Color(0,0,0));
-					consoleResult = "Program successfully parsed ..!";
-				}
-				textAreaConsole.setText(consoleResult);
 				
+				// ********** ANALISIS SEMANTICO **********
+				
+				if (consoleResult.equals("")){
+					System.out.println("Ningún error sintáctico encontrado...!!!");
+					parser.reset();
+					//ParseTree tree = parser.start();
+					Visitor myVisitor = new Visitor();					
+					myVisitor.visit(tree);
+					consoleResult = SQLErrorListener.errorMsg;
+				}
+								
+				if (consoleResult.equals(""))
+					textAreaConsole.setForeground(new Color(0,0,0));
+				
+				
+				textAreaConsole.setText(consoleResult.equals("")? "Program successfully parsed..!":consoleResult);				
 				
 			}
 		});

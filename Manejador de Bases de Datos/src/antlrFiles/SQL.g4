@@ -76,14 +76,12 @@ WhitespaceDeclaration : [\t\r\n\f ]+ -> skip ;
 
 //************************** Union DDL y DML **************************
 
-start	:	ddlDeclaration
-		|	dmlDeclaration
-		;
+start	:	(ddlDeclaration | dmlDeclaration)+ ;
 
 
 //************************** Grammar for DDL **************************
 
-ddlDeclaration	: 	(ddlInstruction ';')+ ;
+ddlDeclaration	: 	ddlInstruction ';' ;
 
 ddlInstruction	: 	CREATE DATABASE ID 						#createDB
 				| 	ALTER DATABASE ID RENAME TO ID			#alterDB
@@ -91,7 +89,7 @@ ddlInstruction	: 	CREATE DATABASE ID 						#createDB
 				| 	SHOW DATABASES							#showDB
 				| 	USE DATABASE ID							#useDB
 				| 	CREATE TABLE ID '(' columns CONSTRAINT constraints ')'	#createTable
-				| 	ALTER TABLE ID RENAME TO ID			#alterTableRename
+				| 	ALTER TABLE ID RENAME TO ID				#alterTableRename
 				| 	ALTER TABLE ID (action)*				#alterTableAccion
 				| 	DROP TABLE ID							#dropTable
 				| 	SHOW TABLES								#showTables
@@ -153,7 +151,7 @@ action 		: ADD COLUMN ID type CONSTRAINT constraints		#actionAddColumn
 
 //************************** Grammar for DML **************************
 
-dmlDeclaration 	:	(dmlInstruction ';')+ ;
+dmlDeclaration 	:	dmlInstruction ';' ;
 
 dmlInstruction 	:	INSERT INTO ID (insertColumns)? VALUES insertValues					#insert
 				| 	UPDATE ID SET assignments (WHERE expression)?						#update
