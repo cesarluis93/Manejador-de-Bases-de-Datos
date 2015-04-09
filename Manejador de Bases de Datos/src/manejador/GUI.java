@@ -171,13 +171,10 @@ public class GUI extends JFrame {
 		scrollPaneEditor.setViewportView(textAreaEditor);
 		
 		TextLineNumber lineas = new TextLineNumber(textAreaEditor);
-		
-		JPanel panel = new JPanel();
-		panelWorkspace.add(panel, BorderLayout.SOUTH);
 		scrollPaneEditor.setRowHeaderView(lineas);
 		
 
-		panelWorkspace2.setPreferredSize(new Dimension(10, 150));
+		panelWorkspace2.setPreferredSize(new Dimension(10, 200));
 		panelWorkspace.add(panelWorkspace2, BorderLayout.SOUTH);
 		panelWorkspace2.setLayout(new BorderLayout(0, 0));
 		

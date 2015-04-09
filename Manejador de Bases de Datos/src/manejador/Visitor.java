@@ -2,6 +2,8 @@ package manejador;
 
 import java.io.File;
 
+import javax.swing.JOptionPane;
+
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.RuleNode;
@@ -182,8 +184,71 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			// TODO Auto-generated catch block
 			SQLErrorListener.errorMsg += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in RENAME DATABASE statement. Could not complete the json instruction.";
 			return "error";
-		}		
+		}
+	}
 
+	@Override
+	public Object visitDropDB(DropDBContext ctx) {
+		// TODO Auto-generated method stub
+		String name = ctx.ID().getText();
+		File folder = new File("databases\\" + name);
+		File masterDatabase = new File("databases\\databases.json");
+		String data = myTools.readFile(masterDatabase);		
+		
+		JSONObject dataJson;
+		boolean dbFound = false;
+		try {
+			dataJson = new JSONObject(data);
+			JSONArray databases = dataJson.getJSONArray("databases");
+			for (int i=0; i<databases.length(); i++){
+				JSONObject database = (JSONObject) databases.get(i);				
+				if (database.getString("name").equals(name)){
+					dbFound = true;
+					String msgConfirm = "¿Borrar base de datos " + name + " con N registros?";
+					int option = JOptionPane.showConfirmDialog(null, msgConfirm);
+			        if(option == JOptionPane.YES_OPTION){
+			        	databases.remove(i);
+			        	folder.delete();
+			        	JOptionPane.showMessageDialog(null, "Database successfully deleted..!");
+			        }
+			        else
+			        	return "void";
+				}
+			}
+			if (!dbFound){
+				SQLErrorListener.errorMsg += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in DROP DATABASE statement. Referenced database does not exist.";
+				return "error";				
+			}
+			
+			myTools.writeFile(masterDatabase, dataJson.toString());
+			return "void";
+			
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			SQLErrorListener.errorMsg += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in DROP DATABASE statement. Could not complete the json instruction.";
+			return "error";
+		}
+	}
+	
+	@Override
+	public Object visitShowDB(ShowDBContext ctx) {
+		// TODO Auto-generated method stub
+		
+		File masterDatabase = new File("databases\\databases.json");
+		String data = myTools.readFile(masterDatabase);		
+		
+		JSONObject dataJson;
+		try {
+			dataJson = new JSONObject(data);
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			SQLErrorListener.errorMsg += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in SHOW DATABASES statement. Could not complete the json instruction.";
+			return "error";
+		}
+		String dataView = myTools.convertToContentJsonView(dataJson.toString());
+		SQLErrorListener.errorMsg = dataView;
+		
+		return "void";
 	}
 	
 	@Override
@@ -253,12 +318,6 @@ public class Visitor extends SQLBaseVisitor<Object> {
 	}
 
 	@Override
-	public Object visitShowDB(ShowDBContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
 	public Object visitExpressionValue(ExpressionValueContext ctx) {
 		// TODO Auto-generated method stub
 		return null;
@@ -314,12 +373,6 @@ public class Visitor extends SQLBaseVisitor<Object> {
 
 	@Override
 	public Object visitTypeInt(TypeIntContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Object visitDropDB(DropDBContext ctx) {
 		// TODO Auto-generated method stub
 		return null;
 	}
