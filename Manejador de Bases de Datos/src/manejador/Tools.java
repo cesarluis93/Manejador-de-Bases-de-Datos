@@ -5,7 +5,13 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileReader;
+import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.nio.file.CopyOption;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 
 public class Tools {
 	public Tools(){}
@@ -84,4 +90,31 @@ public class Tools {
 		}			
 		return toshow;
 	}
+	
+	/**
+	 * Elimina un directorio y su contenido.
+	 * @param directory
+	 */
+	public void deletteDirectory(File directory){		
+		File[] files = directory.listFiles();
+		for (int x=0; x<files.length; x++){
+			if (files[x].isDirectory()) {
+				deletteDirectory(files[x]);
+			}
+			files[x].delete();
+		}
+		directory.delete();
+	}
+	
+    public void copyFiles(String source, String target){
+		File folderSource = new File(source);
+		File newFolder = new File(target);		
+		newFolder.mkdir();
+		File[] files = folderSource.listFiles();		
+		for (int x=0; x<files.length; x++){
+			File newFile = new File(target + "\\" + files[x].getName());			
+			files[x].renameTo(newFile);
+		}
+	    
+    }
 }

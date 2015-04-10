@@ -225,7 +225,7 @@ public class GUI extends JFrame {
 				// ********** ANALISIS SEMANTICO **********
 				
 				if (consoleResult.equals("")){
-					System.out.println("Ningún error sintáctico encontrado...!!!");
+					//System.out.println("Ningún error sintáctico encontrado...!!!");
 					parser.reset();					
 					//ParseTree tree = parser.start();
 					Visitor myVisitor = new Visitor();					
@@ -238,7 +238,7 @@ public class GUI extends JFrame {
 					consoleResult = GUI.msgConfirm;
 				}				
 				
-				textAreaConsole.setText(consoleResult.equals("")? "Program successfully parsed..!":consoleResult);				
+				textAreaConsole.setText(consoleResult);				
 				
 			}
 		});
