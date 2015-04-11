@@ -1,6 +1,7 @@
 package manejador;
 
 import java.io.File;
+import java.util.ArrayList;
 
 import javax.swing.JOptionPane;
 
@@ -12,6 +13,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import antlrFiles.SQLBaseVisitor;
+import antlrFiles.SQLParser;
 import antlrFiles.SQLParser.ActionAddColumnContext;
 import antlrFiles.SQLParser.ActionAddConstraintContext;
 import antlrFiles.SQLParser.ActionDropColumnContext;
@@ -20,9 +22,13 @@ import antlrFiles.SQLParser.AlterDBContext;
 import antlrFiles.SQLParser.AlterTableAccionContext;
 import antlrFiles.SQLParser.AlterTableRenameContext;
 import antlrFiles.SQLParser.And_opContext;
+import antlrFiles.SQLParser.ColumnTableContext;
+import antlrFiles.SQLParser.ColumnsTableContext;
 import antlrFiles.SQLParser.ConstraintCheckContext;
 import antlrFiles.SQLParser.ConstraintForeingKeyContext;
 import antlrFiles.SQLParser.ConstraintPrimaryKeyContext;
+import antlrFiles.SQLParser.ConstraintTypeContext;
+import antlrFiles.SQLParser.ConstraintsContext;
 import antlrFiles.SQLParser.CreateDBContext;
 import antlrFiles.SQLParser.CreateTableContext;
 import antlrFiles.SQLParser.DdlDeclarationContext;
@@ -42,6 +48,7 @@ import antlrFiles.SQLParser.Rel_opContext;
 import antlrFiles.SQLParser.SelectAllContext;
 import antlrFiles.SQLParser.SelectContext;
 import antlrFiles.SQLParser.SelectSomeContext;
+import antlrFiles.SQLParser.SetIDsContext;
 import antlrFiles.SQLParser.ShowColumnsContext;
 import antlrFiles.SQLParser.ShowDBContext;
 import antlrFiles.SQLParser.ShowTablesContext;
@@ -59,10 +66,10 @@ import antlrFiles.SQLParser.UseDBContext;
 
 public class Visitor extends SQLBaseVisitor<Object> {
 	
-	Tools myTools;
+	Tools myTools;	
 	
 	public Visitor(){
-		myTools = new Tools();
+		myTools = new Tools();		
 	}
 
 	@Override
@@ -120,9 +127,6 @@ public class Visitor extends SQLBaseVisitor<Object> {
 		return "void";
 	}
 
-	
-	
-	
 	@Override
 	public Object visitCreateDB(CreateDBContext ctx) {
 		// TODO Auto-generated method stub
@@ -279,11 +283,207 @@ public class Visitor extends SQLBaseVisitor<Object> {
 		
 		return "void";
 	}
+
+	@Override
+	public Object visitUseDB(UseDBContext ctx) {
+		// TODO Auto-generated method stub
+		String name = ctx.ID().getText();
+		File folder = new File("databases\\" + name);
+		if (folder.exists()){
+			GUI.currentDatabase = name;
+			GUI.msgConfirm += "USE DATABASE query returned successfully.\n";
+			return "void";
+		}
+		else{
+			GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in USE DATABASE statement. Referenced database does not exist.";
+			return "error";				
+		}		
+	}
+	
+	@Override
+	public Object visitCreateTable(CreateTableContext ctx) {
+		// TODO Auto-generated method stub
+		// Verify that a database is using.
+		if (GUI.currentDatabase.equals("")){
+			GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. No database loaded.";
+			return "error";				
+		}
+		
+		JSONObject jsonTable = new JSONObject();
+		
+		String tableName = ctx.ID().getText();
+		ArrayList<String[]> columns = (ArrayList<String[]>)visit(ctx.columnsTable());
+		Object[] constraints = (Object[])visit(ctx.constraints());
+				
+		try {
+			
+			JSONArray jsonColumns = new JSONArray();
+			for (String[] col: columns){
+				JSONObject jsonColumn = new JSONObject("{\"name\":" + col[0] + ",\"type\":\"" + col[1] + "\"}");
+				jsonColumns.put(jsonColumn);
+			}
+			
+			JSONObject jsonConstraints = new JSONObject();
+			JSONArray jsonPKs = new JSONArray();
+			JSONObject jsonPK = new JSONObject();
+			for (Object[] pk: (ArrayList<Object[]>)constraints[0]){
+				jsonPK.put("pkName", pk[0]);
+				JSONArray jsonPKColumns = new JSONArray();
+				for (String col: (ArrayList<String>)pk[1])
+					jsonPKColumns.put(col);
+				jsonPK.put("columns", jsonPKColumns);
+				jsonPKs.put(jsonPK);
+			}
+			jsonConstraints.put("pks", jsonPKs);
+			
+			JSONArray jsonFKs = new JSONArray();
+			JSONObject jsonFK = new JSONObject();			
+			for (Object[] fk: (ArrayList<Object[]>)constraints[1]){
+				jsonFK.put("fkName", fk[0]);
+				JSONArray jsonFKLocalColumns = new JSONArray();
+				for (String col: (ArrayList<String>)fk[1])
+					jsonFKLocalColumns.put(col);
+				jsonFK.put("columns", jsonFKLocalColumns);
+				jsonFK.put("tableRef", (String)fk[2]);
+				JSONArray jsonFKRefColumns = new JSONArray();
+				for (String col: (ArrayList<String>)fk[3])
+					jsonFKRefColumns.put(col);
+				jsonFK.put("refColumns", jsonFKRefColumns);
+				
+				// Add the new FOREING KEY.
+				jsonFKs.put(jsonFK);
+			}			
+			jsonConstraints.put("fks", jsonFKs);
+			
+			// Creating the json Table.
+			jsonTable.put("name", tableName);
+			jsonTable.put("columns", jsonColumns);
+			jsonTable.put("constrainst", jsonConstraints);
+			
+			GUI.msgConfirm = myTools.convertToContentJsonView(jsonTable.toString());
+			
+			
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Could not complete the json instruction.";
+			return "error";
+
+		}
+		
+		return "void";
+	}
+	
+	@Override
+	public Object visitColumnsTable(ColumnsTableContext ctx) {
+		// TODO Auto-generated method stub
+		ArrayList<String[]> columns = new ArrayList<String[]>();
+		for (ColumnTableContext column: ctx.columnTable()){			
+			String col[] = (String[])visit(column);
+			columns.add(col);
+		}
+		return columns;
+	}
+	
+	@Override
+	public Object visitColumnTable(ColumnTableContext ctx) {
+		// TODO Auto-generated method stub
+		String id = ctx.ID().getText();
+		String type = (String)visit(ctx.type());
+		String[] col = {id, type};
+		return col;
+	}
+	
+	@Override
+	public Object visitTypeInt(TypeIntContext ctx) {
+		// TODO Auto-generated method stub
+		return "int";
+	}
+
+	@Override
+	public Object visitTypeFloat(TypeFloatContext ctx) {
+		// TODO Auto-generated method stub
+		return "float";
+	}
 	
 	@Override
 	public Object visitTypeDate(TypeDateContext ctx) {
+		// TODO Auto-generated method stub		
+		return "date";
+	}
+
+	@Override
+	public Object visitTypeChar(TypeCharContext ctx) {
 		// TODO Auto-generated method stub
-		return null;
+		return "char : " + ctx.NUM().getText();
+	}
+	
+	@Override
+	public Object visitConstraints(ConstraintsContext ctx) {
+		// TODO Auto-generated method stub
+		// pk = ["pk_name", [id1, id2, id3,...]]
+		ArrayList<Object[]> pks = new ArrayList<Object[]>();
+		// fk = ["fk_name", [id1, id2, id3,...], "refTable", [id1, id2, id3,...]]
+		ArrayList<Object[]> fks = new ArrayList<Object[]>();
+		// check = "id1 < 52 AND name = 'Carlos'";
+		ArrayList<String> checks = new ArrayList<String>();
+		
+		for (ConstraintTypeContext constraint: ctx.constraintType()){
+			// ID PRIMARY KEY '(' setIDs ')'
+			if (constraint.getChildCount() == 6){
+				Object[] pk = (Object[])visit(constraint);
+				pks.add(pk);
+			}
+			// ID FOREIGN KEY '(' setIDs ')' REFERENCES ID '(' setIDs ')'
+			else if (constraint.getChildCount() == 11){
+				Object[] fk = (Object[])visit(constraint);
+				fks.add(fk);
+			}
+			// ID CHECK '(' expression ')'
+			else{
+				String check = (String)visit(constraint);
+				checks.add(check);
+			}
+		}
+		Object[] constraints = {pks, fks, checks};
+		return constraints;
+	}
+	
+	@Override
+	public Object visitConstraintPrimaryKey(ConstraintPrimaryKeyContext ctx) {
+		// TODO Auto-generated method stub
+		String pkName = ctx.ID().getText();
+		ArrayList<String> columns = (ArrayList<String>)visit(ctx.setIDs());		
+		Object[] pk = {pkName, columns};		
+		return pk;
+	}
+	
+	@Override
+	public Object visitConstraintForeingKey(ConstraintForeingKeyContext ctx) {
+		// TODO Auto-generated method stub
+		String pkName = ctx.ID(0).getText();
+		ArrayList<String> localColumns = (ArrayList<String>)visit(ctx.setIDs(0));
+		String tablaRef = ctx.ID(1).getText();
+		ArrayList<String> refColumns = (ArrayList<String>)visit(ctx.setIDs(1));
+		
+		Object[] fk = {pkName, localColumns, tablaRef, refColumns};
+		return fk;
+	}
+	
+	@Override
+	public Object visitConstraintCheck(ConstraintCheckContext ctx) {
+		// TODO Auto-generated method stub
+		String check = (String)visit(ctx.expression());
+		return check;
+	}
+	
+	@Override
+	public Object visitSetIDs(SetIDsContext ctx) {
+		// TODO Auto-generated method stub
+		ArrayList<String> ids = new ArrayList<String>();;
+		for (TerminalNode id: ctx.ID()){
+			ids.add(id.getText());
+		}
+		return ids;
 	}
 	
 	@Override
@@ -299,19 +499,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 	}
 
 	@Override
-	public Object visitTypeChar(TypeCharContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
 	public Object visitSelectSome(SelectSomeContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Object visitConstraintForeingKey(ConstraintForeingKeyContext ctx) {
 		// TODO Auto-generated method stub
 		return null;
 	}
@@ -341,19 +529,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 	}
 
 	@Override
-	public Object visitConstraintCheck(ConstraintCheckContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
 	public Object visitExpressionValue(ExpressionValueContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Object visitUseDB(UseDBContext ctx) {
 		// TODO Auto-generated method stub
 		return null;
 	}
@@ -401,25 +577,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 	}
 
 	@Override
-	public Object visitTypeInt(TypeIntContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Object visitConstraintPrimaryKey(ConstraintPrimaryKeyContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
 	public Object visitDelette(DeletteContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Object visitCreateTable(CreateTableContext ctx) {
 		// TODO Auto-generated method stub
 		return null;
 	}
@@ -462,12 +620,6 @@ public class Visitor extends SQLBaseVisitor<Object> {
 
 	@Override
 	public Object visitSimpleAndExpression(SimpleAndExpressionContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Object visitTypeFloat(TypeFloatContext ctx) {
 		// TODO Auto-generated method stub
 		return null;
 	}

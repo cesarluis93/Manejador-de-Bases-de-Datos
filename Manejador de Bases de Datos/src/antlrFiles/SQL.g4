@@ -88,7 +88,7 @@ ddlInstruction	: 	CREATE DATABASE ID 						#createDB
 				| 	DROP DATABASE ID 						#dropDB
 				| 	SHOW DATABASES							#showDB
 				| 	USE DATABASE ID							#useDB
-				| 	CREATE TABLE ID '(' columns CONSTRAINT constraints ')'	#createTable
+				| 	CREATE TABLE ID '(' columnsTable CONSTRAINT constraints ')'	#createTable
 				| 	ALTER TABLE ID RENAME TO ID				#alterTableRename
 				| 	ALTER TABLE ID (action)*				#alterTableAccion
 				| 	DROP TABLE ID							#dropTable
@@ -96,7 +96,9 @@ ddlInstruction	: 	CREATE DATABASE ID 						#createDB
 				| 	SHOW COLUMNS FROM ID					#showColumns
 				;
 				
-columns	:	(ID type (',' ID type)* )? ;
+columnsTable	:	(columnTable (',' columnTable)* )? ;
+
+columnTable		:	ID type;
 
 type 	: 	INT						#typeInt
 		| 	FLOAT					#typeFloat
@@ -106,10 +108,12 @@ type 	: 	INT						#typeInt
 
 constraints		: 	constraintType (',' constraintType)* ;
 
-constraintType	:	ID PRIMARY KEY '(' (ID (',' ID)* ) ')'				#constraintPrimaryKey
-				|	ID FOREIGN KEY '(' ID (',' ID)* ')' REFERENCES ID '(' ID (',' ID)* ')'		#constraintForeingKey
-				|	ID CHECK '(' expression ')'						#constraintCheck
+constraintType	:	ID PRIMARY KEY '(' setIDs ')'				#constraintPrimaryKey
+				|	ID FOREIGN KEY '(' setIDs ')' REFERENCES ID '(' setIDs ')'		#constraintForeingKey
+				|	ID CHECK '(' expression ')'							#constraintCheck
 				;
+				
+setIDs	:	ID (',' ID)* ;
 
 expression 	:	expression or_op andExpr	#doubleOrExpression	
 		   	| 	andExpr						#simpleAndExpression

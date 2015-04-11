@@ -47,6 +47,7 @@ public class GUI extends JFrame {
 	
 	static String msgConfirm = "";
 	static String msgError = "";
+	static String currentDatabase = "";
 
 	private JPanel contentPane;
 
