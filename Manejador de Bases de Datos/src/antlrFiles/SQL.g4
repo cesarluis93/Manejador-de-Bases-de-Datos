@@ -50,7 +50,7 @@ COLUMNS			: ('c'|'C')('o'|'O')('l'|'L')('u'|'U')('m'|'M')('n'|'N')('s'|'S');
 
 FLOATNUM 	: ('-')?(NUM)'.'(NUM);
 DATED 		: '\'' Digit Digit Digit Digit '-' Digit Digit '-' Digit Digit '\'';
-CHARACTER 	: '\''(Letter)*'\'';
+CHARS 		: '\''(Letter)*'\'';
 INSERT 		: ('i'|'I')('n'|'N')('s'|'S')('e'|'E')('r'|'R')('t'|'T');
 INTO		: ('i'|'I')('n'|'N')('t'|'T')('o'|'O');
 VALUES 		: ('v'|'V')('a'|'A')('l'|'L')('u'|'U')('e'|'E')('s'|'S');
@@ -68,7 +68,6 @@ DESC 		: ('d'|'D')('e'|'E')('s'|'S')('c'|'C');
 
 ID		: Letter (Letter | Digit)*;
 NUM		: ('-')? Digit(Digit)*;
-CHARR 	: ['\''][a-z|A-Z]['\''] ;
 
 Comments: '-''-' ~('\r' | '\n' )*  -> channel(HIDDEN);
 WhitespaceDeclaration : [\t\r\n\f ]+ -> skip ;
@@ -108,49 +107,51 @@ type 	: 	INT						#typeInt
 
 constraints		: 	constraintType (',' constraintType)* ;
 
-constraintType	:	ID PRIMARY KEY '(' setIDs ')'				#constraintPrimaryKey
+constraintType	:	ID PRIMARY KEY '(' setIDs ')'									#constraintPrimaryKey
 				|	ID FOREIGN KEY '(' setIDs ')' REFERENCES ID '(' setIDs ')'		#constraintForeingKey
-				|	ID CHECK '(' expression ')'							#constraintCheck
+				|	ID CHECK '(' expression ')'										#constraintCheck
 				;
 				
 setIDs	:	ID (',' ID)* ;
 
-expression 	:	expression or_op andExpr	#doubleOrExpression	
-		   	| 	andExpr						#simpleAndExpression
+expression 	:	expression orOperator andExpression
+		   	| 	andExpression
 		   	;
 
-andExpr	:	andExpr and_op eqExpr			#doubleAndExpression	
-	    |	eqExpr							#simpleEqExpression
-	    ;
+andExpression	:	andExpression andOperator equalExpression
+	    		|	equalExpression
+	    		;
 
-eqExpr 	:	eqExpr eq_op relationExpr		#doubleEqExpression
-	   	|	relationExpr					#simpleRelExpression
-	  	;
+equalExpression :	equalExpression equalOperator relationExpression
+	   			|	relationExpression
+	  			;
 
-relationExpr	:	relationExpr rel_op unaryExpr	#doubleRelExpression
-			 	|	unaryExpr						#unaryExpression
-			 	;
+relationExpression	:	relationExpression relationOperator unaryExpression
+			 		|	unaryExpression
+			 		;
 
-unaryExpr	:	value  						#simpleUnary
-		 	|	NOT value 					#negationUnary
-		 	; 
+unaryExpression	:	varExpression					#variableExpression
+				|	value							#valueExpression
+			 	|	NOT '(' expression ')'			#notExpression
+		 		; 
 
-value	:	ID						#idValue
-		|	iValue					#varValue
-		|	'(' expression ')' 		#expressionValue
-		;
+varExpression	:	ID
+				|	'(' expression ')'
+				;
 		
-or_op 		:	OR ;
-and_op 		:	AND ;
-eq_op 		:	EQ | NOTEQ ;
-rel_op		: 	LESSTH | GREATTH | LESSEQ | GREATEQ ;
+orOperator 			:	OR ;
+andOperator			:	AND ;
+equalOperator		:	EQ | NOTEQ ;
+relationOperator	: 	LESSTH | GREATTH | LESSEQ | GREATEQ ;
 
 
-action 		: ADD COLUMN ID type CONSTRAINT constraints		#actionAddColumn
-			| ADD CONSTRAINT constraintType					#actionAddConstraint
+action 		: ADD COLUMN ID type CONSTRAINT constraints			#actionAddColumn
+			| ADD CONSTRAINT constraintType						#actionAddConstraint
 			| DROP COLUMN ID									#actionDropColumn
 			| DROP CONSTRAINT ID								#actionDropConstrait
 			;
+
+
 
 
 //************************** Grammar for DML **************************
@@ -165,9 +166,9 @@ dmlInstruction 	:	INSERT INTO ID (insertColumns)? VALUES insertValues					#inser
 
 insertColumns	:	'(' ID (',' ID)* ')' ;
 
-insertValues	:	'(' (iValue (',' iValue)* ) ')' ;
+insertValues	:	'(' (value (',' value)* ) ')' ;
 
-iValue 	: 	integerValue
+value 	: 	integerValue
 		| 	floatValue
 		| 	dateValue
 		| 	charValue
@@ -176,16 +177,15 @@ iValue 	: 	integerValue
 integerValue	:	NUM	;
 floatValue		: 	FLOATNUM ;
 dateValue		:  	DATED ;
-charValue		:  	CHARACTER ;
-
+charValue		:  	CHARS ;
 
 
 assignments	:	asign (',' asign)* ;
 
-asign	:	ID '=' iValue ;
+asign	:	ID '=' value ;
 
 selectColumns	: '*'					#selectAll
-				| (ID (',' ID)*)?		#selectSome
+				| (ID (',' ID)*)		#selectSome
 				;
 	
 order	:	ID (',' ID)* (ASC | DESC)?;

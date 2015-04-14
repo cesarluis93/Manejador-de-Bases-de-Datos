@@ -12,6 +12,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 public class Tools {
 	public Tools(){}
@@ -117,4 +122,87 @@ public class Tools {
 		}
 	    
     }
+    
+    
+    /**
+     * Verifica si un JSONArray de Strings contiene un String determinado.
+     * @param array - Arreglo de strings.
+     * @param item - String a buscar en el arreglo.
+     * @return true - Si item existe en array.
+     * @return false - Si item no existe en array.
+     */
+    public boolean jsonArrayContain(JSONArray array, String item){
+    	for (int i=0; i<array.length(); i++){
+    		try {
+				if (array.getString(i).equals(item))
+					return true;
+			} catch (JSONException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+    	}
+    	return false;
+    }
+    
+    /**
+     * Verifica si un JSONArray de Objetos contiene un Objeto determinado.
+     * @param array
+     * @param object
+     * @param objectItems
+     * @return
+     */
+    public boolean jsonArrayContain(JSONArray array, JSONObject object, ArrayList<String> objectItems){
+    	int cont;
+    	for (int i=0; i<array.length(); i++){
+    		JSONObject obj;
+			try {
+				obj = array.getJSONObject(i);
+				cont = 0;
+	    		for (String objItem: objectItems){
+	    			cont++;
+	    			if (!obj.get(objItem).equals(object.get(objItem))){	    				
+	    				break;
+	    			}
+	    			if (cont == objectItems.size()){
+    					return true;
+    				}
+	    		}
+			} catch (JSONException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+    	}
+    	return false;
+    }
+    
+    
+    /**
+     * Método auxiliar que sustrae los ids de una expresión booleana.
+     * @param expression
+     * @return Object[] - array con la expressión limpiada y Arraylist de los ids.
+     */
+    public Object[] getColumns(String expression){		
+		String newExpression = "";
+		ArrayList<String> columns = new ArrayList();
+		char prev = ' ';		 
+		for (int i=0; i<expression.length(); i++){
+			if (expression.charAt(i) == 'd' && prev == 'i'){
+				newExpression = newExpression.substring(0, newExpression.length()-1);
+				String resto = expression.substring(i, expression.length());
+				String id = resto.substring(2, resto.indexOf("]"));
+				columns.add(id);
+				i += id.length()+2;
+				newExpression += id;
+				prev = ' ';
+			}
+			else{
+				newExpression += expression.charAt(i);
+				prev = expression.charAt(i);
+			}
+		}
+		Object[] result = {newExpression, columns};
+		return result;
+    }
+    
+    
 }

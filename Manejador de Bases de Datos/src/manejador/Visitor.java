@@ -1,6 +1,7 @@
 package manejador;
 
 import java.io.File;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 
 import javax.swing.JOptionPane;
@@ -13,7 +14,6 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import antlrFiles.SQLBaseVisitor;
-import antlrFiles.SQLParser;
 import antlrFiles.SQLParser.ActionAddColumnContext;
 import antlrFiles.SQLParser.ActionAddConstraintContext;
 import antlrFiles.SQLParser.ActionDropColumnContext;
@@ -21,7 +21,8 @@ import antlrFiles.SQLParser.ActionDropConstraitContext;
 import antlrFiles.SQLParser.AlterDBContext;
 import antlrFiles.SQLParser.AlterTableAccionContext;
 import antlrFiles.SQLParser.AlterTableRenameContext;
-import antlrFiles.SQLParser.And_opContext;
+import antlrFiles.SQLParser.AndExpressionContext;
+import antlrFiles.SQLParser.CharValueContext;
 import antlrFiles.SQLParser.ColumnTableContext;
 import antlrFiles.SQLParser.ColumnsTableContext;
 import antlrFiles.SQLParser.ConstraintCheckContext;
@@ -31,20 +32,21 @@ import antlrFiles.SQLParser.ConstraintTypeContext;
 import antlrFiles.SQLParser.ConstraintsContext;
 import antlrFiles.SQLParser.CreateDBContext;
 import antlrFiles.SQLParser.CreateTableContext;
+import antlrFiles.SQLParser.DateValueContext;
 import antlrFiles.SQLParser.DdlDeclarationContext;
 import antlrFiles.SQLParser.DeletteContext;
 import antlrFiles.SQLParser.DmlDeclarationContext;
-import antlrFiles.SQLParser.DoubleAndExpressionContext;
-import antlrFiles.SQLParser.DoubleEqExpressionContext;
 import antlrFiles.SQLParser.DropDBContext;
 import antlrFiles.SQLParser.DropTableContext;
-import antlrFiles.SQLParser.Eq_opContext;
-import antlrFiles.SQLParser.ExpressionValueContext;
-import antlrFiles.SQLParser.IdValueContext;
+import antlrFiles.SQLParser.EqualExpressionContext;
+import antlrFiles.SQLParser.EqualOperatorContext;
+import antlrFiles.SQLParser.ExpressionContext;
+import antlrFiles.SQLParser.FloatValueContext;
 import antlrFiles.SQLParser.InsertContext;
-import antlrFiles.SQLParser.NegationUnaryContext;
-import antlrFiles.SQLParser.Or_opContext;
-import antlrFiles.SQLParser.Rel_opContext;
+import antlrFiles.SQLParser.IntegerValueContext;
+import antlrFiles.SQLParser.NotExpressionContext;
+import antlrFiles.SQLParser.RelationExpressionContext;
+import antlrFiles.SQLParser.RelationOperatorContext;
 import antlrFiles.SQLParser.SelectAllContext;
 import antlrFiles.SQLParser.SelectContext;
 import antlrFiles.SQLParser.SelectSomeContext;
@@ -52,9 +54,6 @@ import antlrFiles.SQLParser.SetIDsContext;
 import antlrFiles.SQLParser.ShowColumnsContext;
 import antlrFiles.SQLParser.ShowDBContext;
 import antlrFiles.SQLParser.ShowTablesContext;
-import antlrFiles.SQLParser.SimpleAndExpressionContext;
-import antlrFiles.SQLParser.SimpleEqExpressionContext;
-import antlrFiles.SQLParser.SimpleUnaryContext;
 import antlrFiles.SQLParser.StartContext;
 import antlrFiles.SQLParser.TypeCharContext;
 import antlrFiles.SQLParser.TypeDateContext;
@@ -62,11 +61,15 @@ import antlrFiles.SQLParser.TypeFloatContext;
 import antlrFiles.SQLParser.TypeIntContext;
 import antlrFiles.SQLParser.UpdateContext;
 import antlrFiles.SQLParser.UseDBContext;
+import antlrFiles.SQLParser.ValueContext;
+import antlrFiles.SQLParser.ValueExpressionContext;
+import antlrFiles.SQLParser.VarExpressionContext;
+import antlrFiles.SQLParser.VariableExpressionContext;
 
 
 public class Visitor extends SQLBaseVisitor<Object> {
 	
-	Tools myTools;	
+	Tools myTools;
 	
 	public Visitor(){
 		myTools = new Tools();		
@@ -135,17 +138,17 @@ public class Visitor extends SQLBaseVisitor<Object> {
 		if (!folder.exists()){
 			// Load existing data bases.
 			File masterDatabasesFile = new File("databases\\masterDatabases.json");
-			String data = myTools.readFile(masterDatabasesFile);			
+			String data = myTools.readFile(masterDatabasesFile);
 			JSONObject masterDatabases, masterDatabase;
 			try {
 				// Put a new database to master database.
 				masterDatabases = new JSONObject(data);
 				JSONObject newDB = new JSONObject("{\"name\":\"" + dataBaseName + "\",\"numTables\":" + 0 + "}");
-				masterDatabase = new JSONObject("{\"tables\":[]}");								
+				masterDatabase = new JSONObject("{\"tables\":[]}");
 				masterDatabases.getJSONArray("databases").put(newDB);				
 			} catch (JSONException e) {
 				// TODO Auto-generated catch block
-				GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE DATABASE statement. Could not complete the json instruction.";
+				GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE DATABASE statement. A json instruction was not completed.";
 				return "error";
 			}
 			
@@ -161,7 +164,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			return "void";
 		}
 		else{
-			GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE DATABASE statement. There is already a database with the same name.";
+			GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE DATABASE statement. Database whith that name already exist.";
 			return "error";
 		}
 		
@@ -201,7 +204,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 				
 			} catch (JSONException e) {
 				// TODO Auto-generated catch block
-				GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in RENAME DATABASE statement. Could not complete the json instruction.";
+				GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in RENAME DATABASE statement. A json instruction was not completed.";
 				return "error";
 			}			
 		}
@@ -247,7 +250,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 				
 			} catch (JSONException e) {
 				// TODO Auto-generated catch block
-				GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in DROP DATABASE statement. Could not complete the json instruction.";
+				GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in DROP DATABASE statement. A json instruction was not completed.";
 				return "error";
 			}			
 		}
@@ -271,7 +274,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			masterDatabases = new JSONObject(data);
 		} catch (JSONException e) {
 			// TODO Auto-generated catch block
-			GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in SHOW DATABASES statement. Could not complete the json instruction.";
+			GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in SHOW DATABASES statement. A json instruction was not completed.";
 			return "error";
 		}
 		
@@ -302,75 +305,274 @@ public class Visitor extends SQLBaseVisitor<Object> {
 	
 	@Override
 	public Object visitCreateTable(CreateTableContext ctx) {
-		// TODO Auto-generated method stub
+		
 		// Verify that a database is using.
 		if (GUI.currentDatabase.equals("")){
 			GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. No database loaded.";
 			return "error";				
 		}
+				
+		JSONObject jsonTableSchema = new JSONObject();
 		
-		JSONObject jsonTable = new JSONObject();
+
+		// ************ NAME OF THE TABLE ************
 		
 		String tableName = ctx.ID().getText();
+		
+		File masterDatabaseFile = new File("databases\\"+ GUI.currentDatabase + "\\masterDatabase.json");
+		String data = myTools.readFile(masterDatabaseFile);
+		JSONObject masterDatabase;
+		JSONArray tables;
+		
+		try {
+			masterDatabase = new JSONObject(data);
+			tables = masterDatabase.getJSONArray("tables");			
+			for (int i=0; i<tables.length(); i++){
+				JSONObject table = (JSONObject) tables.get(i);
+				if (table.getString("name").equals(tableName)){
+					GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Table whith that name already exist.";
+					return "error";					
+				}
+			}
+		} catch (JSONException e1) {
+			// TODO Auto-generated catch block
+			GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. A json instruction was not completed.";
+			return "error";
+		}
+		
+		
+		// ************ COLUMNS OF THE TABLE ************
+		
 		ArrayList<String[]> columns = (ArrayList<String[]>)visit(ctx.columnsTable());
+		ArrayList<String> columnsAux = new ArrayList<String>();
 		Object[] constraints = (Object[])visit(ctx.constraints());
 				
 		try {
-			
 			JSONArray jsonColumns = new JSONArray();
 			for (String[] col: columns){
-				JSONObject jsonColumn = new JSONObject("{\"name\":" + col[0] + ",\"type\":\"" + col[1] + "\"}");
+				// Verify that the length of a CHAR variable is greater than zero.
+				String name = (String)col[0];
+				String type = (String)col[1];
+				
+				if (type.contains("char")){
+					int num = Integer.parseInt(type.split(":")[1]);					
+					if (num < 1){
+						GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in VAR type statement. The length of a CHAR type variable, must be greater than zero.";
+						return "error";
+					}
+				}
+				
+				// Check repeated columns.
+				if (columnsAux.contains(name)){
+					GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Repeated columns were found.";
+					return "error";
+				}
+				
+				// If there is no error, we get a new column.
+				JSONObject jsonColumn = new JSONObject();
+				jsonColumn.put("name", name);
+				jsonColumn.put("type", type);
 				jsonColumns.put(jsonColumn);
+				// Also add to the list of columns.
+				columnsAux.add(name);
 			}
+			
+			
+			
+			// ************ CONSTRAINTS OF THE TABLE ************
 			
 			JSONObject jsonConstraints = new JSONObject();
+			
+			
+			// ************ Obtain primary key of the table ************
 			JSONArray jsonPKs = new JSONArray();
 			JSONObject jsonPK = new JSONObject();
-			for (Object[] pk: (ArrayList<Object[]>)constraints[0]){
-				jsonPK.put("pkName", pk[0]);
-				JSONArray jsonPKColumns = new JSONArray();
-				for (String col: (ArrayList<String>)pk[1])
-					jsonPKColumns.put(col);
-				jsonPK.put("columns", jsonPKColumns);
-				jsonPKs.put(jsonPK);
+			
+			ArrayList<Object[]> pks = (ArrayList<Object[]>)constraints[0];
+			// There must be only one primary key.
+			if (pks.size() > 1){
+				GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. There must be only one primary key.";
+				return "error";				
 			}
+			
+			jsonPK.put("pkName", pks.get(0)[0]);
+			JSONArray jsonPKColumns = new JSONArray();
+			for (String col: (ArrayList<String>) pks.get(0)[1]){
+				if (!columnsAux.contains(col)){
+					GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Column referenced by PRIMARY KEY does not exist.";
+					return "error";
+				}
+				if (myTools.jsonArrayContain(jsonPKColumns, col)){
+					GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Repeated columns were found in PRIMARY KEY.";
+					return "error";
+				}
+				jsonPKColumns.put(col);					
+			}
+			jsonPK.put("columns", jsonPKColumns);
+			jsonPKs.put(jsonPK);
 			jsonConstraints.put("pks", jsonPKs);
 			
+
+			
+			// ************Obtain foreign keys of the table ************
+						
 			JSONArray jsonFKs = new JSONArray();
-			JSONObject jsonFK = new JSONObject();			
+			JSONObject jsonFK = new JSONObject();
+			ArrayList<String> fkNames = new ArrayList<String>();
+			String fkName;
+			
+			
 			for (Object[] fk: (ArrayList<Object[]>)constraints[1]){
+				
+				if (fkNames.contains(fk[0])){
+					GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. FOREIGN KEY whith that name already exist.";
+					return "error";
+				}
 				jsonFK.put("fkName", fk[0]);
+				
+				
 				JSONArray jsonFKLocalColumns = new JSONArray();
-				for (String col: (ArrayList<String>)fk[1])
+				for (String col: (ArrayList<String>)fk[1]){
+					if (!columnsAux.contains(col)){
+						GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Column referenced by FOREIGN KEY does not exist.";
+						return "error";
+					}
 					jsonFKLocalColumns.put(col);
+				}
 				jsonFK.put("columns", jsonFKLocalColumns);
-				jsonFK.put("tableRef", (String)fk[2]);
-				JSONArray jsonFKRefColumns = new JSONArray();
-				for (String col: (ArrayList<String>)fk[3])
-					jsonFKRefColumns.put(col);
+				
+				
+				String tableRefName = (String)fk[2];				
+				JSONObject jsonTableRef;
+				JSONArray jsonTableRefColumns = null;
+				boolean tableRefExist = false;
+				for (int i=0; i<tables.length(); i++){
+					jsonTableRef = (JSONObject) tables.get(i);					
+					if (jsonTableRef.getString("name").equals(tableRefName)){
+						jsonTableRefColumns = jsonTableRef.getJSONArray("columns");
+						tableRefExist = true;
+						break;
+					}
+				}
+				if (!tableRefExist){
+					GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Table referenced by a FOREIGN KEY does not exist.";
+					return "error";
+				}
+				
+				jsonFK.put("tableRef", tableRefName);
+				
+				// Obtain columns referenced by FOREIGN KEY.
+				JSONArray jsonFKRefColumns = new JSONArray();				
+				for (String col: (ArrayList<String>)fk[3]){
+					// Verify that this column for FOREIGN KEY exists in the referenced table.					
+					if (myTools.jsonArrayContain(jsonFKRefColumns, col)){						
+						GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Repeated columns were found in FOREIGN KEY.";
+						return "error";
+					}					
+					jsonFKRefColumns.put(col);					
+				}
+				
+				// Check compatibility FOREIGN KEY columns.
+				if (jsonFKLocalColumns.length() == jsonFKRefColumns.length()){
+					for (int i=0; i<jsonFKRefColumns.length(); i++){
+						String fkRefColumn = jsonFKRefColumns.getString(i);
+						// Verify that the referenced columns exist in this table.
+						if (!myTools.jsonArrayContain(jsonFKLocalColumns, fkRefColumn)){
+							GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. FOREIGN KEY columns are incompatible.";
+							return "error";
+						}
+						for (int j=0; j<jsonColumns.length(); j++){
+							JSONObject jsonColumn = jsonColumns.getJSONObject(i);
+							if (jsonColumn.get("name").equals(fkRefColumn)){
+								ArrayList<String> items = new ArrayList();
+								items.add("name");
+								items.add("type");
+								if (!myTools.jsonArrayContain(jsonTableRefColumns, jsonColumn, items)){
+									GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Column referenced by FOREIGN KEY does not exist in referenced table.";
+									return "error";
+								}
+								else{
+									break;
+								}
+							}
+						}
+					}
+				}
+				else{
+					GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. FOREIGN KEY columns are incompatible.";
+					return "error";
+				}
+				
+				
 				jsonFK.put("refColumns", jsonFKRefColumns);
 				
 				// Add the new FOREING KEY.
 				jsonFKs.put(jsonFK);
+				fkNames.add((String) fk[0]);
 			}			
 			jsonConstraints.put("fks", jsonFKs);
 			
-			// Creating the json Table.
-			jsonTable.put("name", tableName);
-			jsonTable.put("columns", jsonColumns);
-			jsonTable.put("constrainst", jsonConstraints);
 			
-			GUI.msgConfirm = myTools.convertToContentJsonView(jsonTable.toString());
+			
+			
+			// Obtain checks of the table.
+			ArrayList<String[]> checks = (ArrayList<String[]>)constraints[2];
+			JSONArray jsonChecks = new JSONArray();
+			ArrayList<String> checkNames = new ArrayList();
+			for (String[] check: checks){
+				String checkName = check[0];
+				String checkExpression = check[1];
+				if (checkNames.contains(checkName)){
+					GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. CHECK whith that name already exist.";
+					return "error";
+				}
+				
+				Object[] expression = myTools.getColumns(checkExpression);
+				checkExpression = (String)expression[0];
+				ArrayList<String> ids = (ArrayList<String>)expression[1];
+				for (String id: ids){
+					if (!columnsAux.contains(id)){
+						GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. ID referenced by CHECK expression does not exist.";
+						return "error";						
+					}
+				}
+				
+				JSONObject jsonCheck = new JSONObject();
+				jsonCheck.put("name", checkName);
+				jsonCheck.put("check", checkExpression);
+				jsonChecks.put(jsonCheck);
+				checkNames.add(checkName);
+			}
+			
+			
+			
+			// ************ Creating the json Table ************
+			jsonTableSchema.put("name", tableName);
+			jsonTableSchema.put("columns", jsonColumns);
+			jsonTableSchema.put("constrainst", jsonConstraints);
+			jsonTableSchema.put("checks", jsonChecks);
+			
+			tables.put(jsonTableSchema);
+			
+			
+			JSONObject jsonTable = new JSONObject("{\"data\":[]}");				
+			myTools.writeFile(masterDatabaseFile, masterDatabase.toString());
+			File tableFile = new File("databases\\"+ GUI.currentDatabase + "\\" + tableName + ".json");			
+			myTools.writeFile(tableFile, jsonTable.toString());
+						
+			GUI.msgConfirm += "CREATE TALBE query returned successfully.\n\n";			
+			GUI.msgConfirm += myTools.convertToContentJsonView(jsonTableSchema.toString());
+			return "void";
 			
 			
 		} catch (JSONException e) {
+			System.err.println(e.getMessage());
 			// TODO Auto-generated catch block
-			GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Could not complete the json instruction.";
+			GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. A json instruction was not completed.";
 			return "error";
 
 		}
-		
-		return "void";
+				
 	}
 	
 	@Override
@@ -378,7 +580,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 		// TODO Auto-generated method stub
 		ArrayList<String[]> columns = new ArrayList<String[]>();
 		for (ColumnTableContext column: ctx.columnTable()){			
-			String col[] = (String[])visit(column);
+			String[] col = (String[])visit(column);
 			columns.add(col);
 		}
 		return columns;
@@ -388,7 +590,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 	public Object visitColumnTable(ColumnTableContext ctx) {
 		// TODO Auto-generated method stub
 		String id = ctx.ID().getText();
-		String type = (String)visit(ctx.type());
+		String type = (String)visit(ctx.type());		
 		String[] col = {id, type};
 		return col;
 	}
@@ -414,7 +616,8 @@ public class Visitor extends SQLBaseVisitor<Object> {
 	@Override
 	public Object visitTypeChar(TypeCharContext ctx) {
 		// TODO Auto-generated method stub
-		return "char : " + ctx.NUM().getText();
+		int num = Integer.parseInt(ctx.NUM().getText());
+		return "char" + ":" + num;
 	}
 	
 	@Override
@@ -425,7 +628,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 		// fk = ["fk_name", [id1, id2, id3,...], "refTable", [id1, id2, id3,...]]
 		ArrayList<Object[]> fks = new ArrayList<Object[]>();
 		// check = "id1 < 52 AND name = 'Carlos'";
-		ArrayList<String> checks = new ArrayList<String>();
+		ArrayList<String[]> checks = new ArrayList<String[]>();
 		
 		for (ConstraintTypeContext constraint: ctx.constraintType()){
 			// ID PRIMARY KEY '(' setIDs ')'
@@ -440,7 +643,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			}
 			// ID CHECK '(' expression ')'
 			else{
-				String check = (String)visit(constraint);
+				String[] check = (String[])visit(constraint);				
 				checks.add(check);
 			}
 		}
@@ -472,7 +675,9 @@ public class Visitor extends SQLBaseVisitor<Object> {
 	@Override
 	public Object visitConstraintCheck(ConstraintCheckContext ctx) {
 		// TODO Auto-generated method stub
-		String check = (String)visit(ctx.expression());
+		String name = ctx.ID().getText();
+		String expression = (String)visit(ctx.expression());
+		String[] check = {name, expression};
 		return check;
 	}
 	
@@ -487,13 +692,139 @@ public class Visitor extends SQLBaseVisitor<Object> {
 	}
 	
 	@Override
-	public Object visitShowColumns(ShowColumnsContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
+	public Object visitExpression(ExpressionContext ctx) {
+		String result;
+		if (ctx.getChildCount() == 3){
+			String expression = (String)visit(ctx.expression());
+			String andExpression = (String)visit(ctx.andExpression());
+			result =  expression + " || " + andExpression;
+		}
+		else{
+			result = (String)visit(ctx.andExpression());		
+		}
+		return result;
 	}
 
 	@Override
-	public Object visitRel_op(Rel_opContext ctx) {
+	public Object visitAndExpression(AndExpressionContext ctx) {
+		String result;
+		if (ctx.getChildCount() == 3){
+			String andExpression = (String)visit(ctx.andExpression());
+			String equalExpression = (String)visit(ctx.equalExpression());
+			result =  andExpression + " && " + equalExpression;
+		}
+		else{
+			result = (String)visit(ctx.equalExpression());
+		}
+		return result;
+	}
+	
+	@Override
+	public Object visitEqualExpression(EqualExpressionContext ctx) {
+		String result;
+		if (ctx.getChildCount() == 3){
+			String equalExpression = (String)visit(ctx.equalExpression());
+			String equalOperator = (String)visit(ctx.equalOperator());
+			String relationExpression = (String)visit(ctx.relationExpression());
+			result =  equalExpression + " " +  equalOperator + " " + relationExpression;
+		}
+		else{
+			result = (String)visit(ctx.relationExpression());
+		}
+		return result;
+	}
+	
+	@Override
+	public Object visitRelationExpression(RelationExpressionContext ctx) {
+		String result;
+		if (ctx.getChildCount() == 3){
+			String relationExpression = (String)visit(ctx.relationExpression());
+			String relationOperator = (String)visit(ctx.relationOperator());
+			String unaryExpression = (String)visit(ctx.unaryExpression());
+			result =  relationExpression + " " +  relationOperator + " " + unaryExpression;
+		}
+		else{
+			result = (String)visit(ctx.unaryExpression());
+		}
+		return result;
+	}
+	
+	@Override
+	public Object visitVariableExpression(VariableExpressionContext ctx) {
+		String result = (String)visit(ctx.varExpression());
+		return result;
+	}
+	
+	@Override
+	public Object visitValueExpression(ValueExpressionContext ctx) {
+		String result = (String)visit(ctx.value());
+		return result;
+	}
+	
+	@Override
+	public Object visitNotExpression(NotExpressionContext ctx) {
+		String expression = (String)visit(ctx.expression());
+		String result = "! (" + expression + ")";
+		return result;
+	}
+
+	@Override
+	public Object visitVarExpression(VarExpressionContext ctx) {
+		if (ctx.getChildCount() == 1){
+			return "id[" + ctx.ID().getText() + "]";
+		}
+		else{
+			String expression = (String)visit(ctx.expression());
+			String result = "(" + expression + ")";
+			return result;
+		}
+	}
+	
+	@Override
+	public Object visitValue(ValueContext ctx) {	
+		return visit(ctx.getChild(0));
+	}
+	
+	@Override
+	public Object visitIntegerValue(IntegerValueContext ctx) {	
+		return ctx.NUM().getText();
+	}
+	
+	@Override
+	public Object visitFloatValue(FloatValueContext ctx) {
+		return ctx.FLOATNUM().getText();
+	}
+	
+	@Override
+	public Object visitDateValue(DateValueContext ctx) {
+		return ctx.DATED().getText();
+	}
+	
+	@Override
+	public Object visitCharValue(CharValueContext ctx) {
+		return ctx.CHARS().getText();
+	}
+	
+	@Override
+	public Object visitEqualOperator(EqualOperatorContext ctx) {
+		return (ctx.EQ() != null)? "==": "!=";
+	}
+		
+	@Override
+	public Object visitRelationOperator(RelationOperatorContext ctx) {
+		// TODO Auto-generated method stub
+		return ctx.getChild(0).getText();
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	@Override
+	public Object visitShowColumns(ShowColumnsContext ctx) {
 		// TODO Auto-generated method stub
 		return null;
 	}
@@ -505,43 +836,13 @@ public class Visitor extends SQLBaseVisitor<Object> {
 	}
 
 	@Override
-	public Object visitDoubleEqExpression(DoubleEqExpressionContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
 	public Object visitActionDropConstrait(ActionDropConstraitContext ctx) {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
 	@Override
-	public Object visitIdValue(IdValueContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
 	public Object visitSelect(SelectContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Object visitExpressionValue(ExpressionValueContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Object visitSimpleEqExpression(SimpleEqExpressionContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Object visitSimpleUnary(SimpleUnaryContext ctx) {
 		// TODO Auto-generated method stub
 		return null;
 	}
@@ -565,12 +866,6 @@ public class Visitor extends SQLBaseVisitor<Object> {
 	}
 
 	@Override
-	public Object visitAnd_op(And_opContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
 	public Object visitUpdate(UpdateContext ctx) {
 		// TODO Auto-generated method stub
 		return null;
@@ -584,12 +879,6 @@ public class Visitor extends SQLBaseVisitor<Object> {
 
 	@Override
 	public Object visitActionAddColumn(ActionAddColumnContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Object visitDoubleAndExpression(DoubleAndExpressionContext ctx) {
 		// TODO Auto-generated method stub
 		return null;
 	}
@@ -613,32 +902,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 	}
 
 	@Override
-	public Object visitOr_op(Or_opContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Object visitSimpleAndExpression(SimpleAndExpressionContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
 	public Object visitSelectAll(SelectAllContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-
-	@Override
-	public Object visitNegationUnary(NegationUnaryContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Object visitEq_op(Eq_opContext ctx) {
 		// TODO Auto-generated method stub
 		return null;
 	}

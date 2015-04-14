@@ -15,9 +15,15 @@ import java.awt.Dimension;
 import java.awt.Color;
 
 import javax.swing.JTree;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.Caret;
+import javax.swing.text.Document;
+import javax.swing.text.Element;
+import javax.swing.text.JTextComponent;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.TreePath;
+import javax.swing.event.CaretEvent;
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.JButton;
@@ -39,6 +45,8 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
+import java.util.List;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.Font;
@@ -196,11 +204,32 @@ public class GUI extends JFrame {
 				textAreaConsole.setText("");
 				textAreaConsole.setForeground(new Color(255,0,0));
 				
-				String userCode = textAreaEditor.getSelectedText();				
+				// Looking for the selected text.
+				String userCode = textAreaEditor.getSelectedText();
+				
+				// If no text is selected, get the text before the cursor on the line where it is it.
 				if (userCode == null){
+					/*
+					Caret car = textAreaEditor.getCaret();
+					int dot = car.getDot();
+				    int line = 0;
+				    int positionInLine = 0;
+					try {
+						line = getLineOfOffset(textAreaEditor, dot);					
+						positionInLine = dot - getLineStartOffset(textAreaEditor, line);
+						userCode = textAreaEditor.getText(line, positionInLine);
+					} catch (BadLocationException e1) {
+						e1.printStackTrace();
+					}
+					
+					System.out.println(userCode);
+					return;
+					*/
+					
 					GUI.msgError = "Error: Impossible to process. Select query to execute.";
 					textAreaConsole.setText(GUI.msgError);
 					return;
+					
 				}
 				
 				// create a CharStream that reads from standard input
@@ -218,6 +247,7 @@ public class GUI extends JFrame {
 				// ********** ANALISIS SINTACTICO **********
 				
 				ParseTree tree = parser.start();	
+				//parser.reset();
 				//parser.start().inspect(parser);
 				
 				// Result of parsing
@@ -227,8 +257,6 @@ public class GUI extends JFrame {
 				
 				if (consoleResult.equals("")){
 					//System.out.println("Ningún error sintáctico encontrado...!!!");
-					parser.reset();					
-					//ParseTree tree = parser.start();
 					Visitor myVisitor = new Visitor();					
 					myVisitor.visit(tree);
 					consoleResult = GUI.msgError;
@@ -239,8 +267,7 @@ public class GUI extends JFrame {
 					consoleResult = GUI.msgConfirm;
 				}				
 				
-				textAreaConsole.setText(consoleResult);				
-				
+				textAreaConsole.setText(consoleResult);
 			}
 		});
 		btnCompile.setSize(new Dimension(100, 0));
@@ -270,6 +297,18 @@ public class GUI extends JFrame {
 			}
 		});
 		btnLoadFile.setSize(new Dimension(100, 0));
+		
+		JButton btnReset = new JButton("Reset");
+		btnReset.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				try {
+					restartApplication(null);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+		});
 		GroupLayout gl_panelBotones = new GroupLayout(panelBotones);
 		gl_panelBotones.setHorizontalGroup(
 			gl_panelBotones.createParallelGroup(Alignment.LEADING)
@@ -278,14 +317,18 @@ public class GUI extends JFrame {
 					.addComponent(btnCompile, GroupLayout.PREFERRED_SIZE, 147, GroupLayout.PREFERRED_SIZE)
 					.addPreferredGap(ComponentPlacement.RELATED)
 					.addComponent(btnLoadFile, GroupLayout.PREFERRED_SIZE, 147, GroupLayout.PREFERRED_SIZE)
-					.addContainerGap(GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+					.addGap(18)
+					.addComponent(btnReset)
+					.addContainerGap(785, Short.MAX_VALUE))
 		);
 		gl_panelBotones.setVerticalGroup(
 			gl_panelBotones.createParallelGroup(Alignment.LEADING)
 				.addGroup(gl_panelBotones.createSequentialGroup()
 					.addGap(7)
 					.addGroup(gl_panelBotones.createParallelGroup(Alignment.LEADING)
-						.addComponent(btnLoadFile, GroupLayout.PREFERRED_SIZE, 36, GroupLayout.PREFERRED_SIZE)
+						.addGroup(gl_panelBotones.createParallelGroup(Alignment.BASELINE)
+							.addComponent(btnLoadFile, GroupLayout.PREFERRED_SIZE, 36, GroupLayout.PREFERRED_SIZE)
+							.addComponent(btnReset))
 						.addComponent(btnCompile, GroupLayout.PREFERRED_SIZE, 36, GroupLayout.PREFERRED_SIZE))
 					.addContainerGap())
 		);
@@ -299,4 +342,107 @@ public class GUI extends JFrame {
 		scrollPaneConsole.setViewportView(textAreaConsole);
 		
 	}
+	
+	
+	
+	static int getLineOfOffset(JTextComponent comp, int offset) throws BadLocationException {
+	    Document doc = comp.getDocument();
+	    if (offset < 0) {
+	        throw new BadLocationException("Can't translate offset to line", -1);
+	    } else if (offset > doc.getLength()) {
+	        throw new BadLocationException("Can't translate offset to line", doc.getLength() + 1);
+	    } else {
+	        Element map = doc.getDefaultRootElement();
+	        return map.getElementIndex(offset);
+	    }
+	}
+
+	static int getLineStartOffset(JTextComponent comp, int line) throws BadLocationException {
+	    Element map = comp.getDocument().getDefaultRootElement();
+	    if (line < 0) {
+	        throw new BadLocationException("Negative line", -1);
+	    } else if (line >= map.getElementCount()) {
+	        throw new BadLocationException("No such line", comp.getDocument().getLength() + 1);
+	    } else {
+	        Element lineElem = map.getElement(line);
+	        return lineElem.getStartOffset();
+	    }
+	}	
+	
+	
+	
+	
+	/**
+	 * Método que sirve para reiniciar el programa. Sirvió para facilitar las pruebas mientras se programaba.
+	 * Tomado de: http://java.dzone.com/articles/programmatically-restart-java
+	 */	
+	
+	/** 
+	 * Sun property pointing the main class and its arguments. 
+	 * Might not be defined on non Hotspot VM implementations.
+	 */
+	public static final String SUN_JAVA_COMMAND = "sun.java.command";
+
+	/**
+	 * Restart the current Java application
+	 * @param runBeforeRestart some custom code to be run before restarting
+	 * @throws IOException
+	 */
+	public static void restartApplication(Runnable runBeforeRestart) throws IOException {
+		try {
+			// java binary
+			String java = System.getProperty("java.home") + "/bin/java";
+			// vm arguments
+			List<String> vmArguments = ManagementFactory.getRuntimeMXBean().getInputArguments();
+			StringBuffer vmArgsOneLine = new StringBuffer();
+			for (String arg : vmArguments) {
+				// if it's the agent argument : we ignore it otherwise the
+				// address of the old application and the new one will be in conflict
+				if (!arg.contains("-agentlib")) {
+					vmArgsOneLine.append(arg);
+					vmArgsOneLine.append(" ");
+				}
+			}
+			// init the command to execute, add the vm args
+			final StringBuffer cmd = new StringBuffer("\"" + java + "\" " + vmArgsOneLine);
+
+			// program main and program arguments
+			String[] mainCommand = System.getProperty(SUN_JAVA_COMMAND).split(" ");
+			// program main is a jar
+			if (mainCommand[0].endsWith(".jar")) {
+				// if it's a jar, add -jar mainJar
+				cmd.append("-jar " + new File(mainCommand[0]).getPath());
+			} else {
+				// else it's a .class, add the classpath and mainClass
+				cmd.append("-cp \"" + System.getProperty("java.class.path") + "\" " + mainCommand[0]);
+			}
+			// finally add program arguments
+			for (int i = 1; i < mainCommand.length; i++) {
+				cmd.append(" ");
+				cmd.append(mainCommand[i]);
+			}
+			// execute the command in a shutdown hook, to be sure that all the
+			// resources have been disposed before restarting the application
+			Runtime.getRuntime().addShutdownHook(new Thread() {
+				@Override
+				public void run() {
+					try {
+						Runtime.getRuntime().exec(cmd.toString());
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+			});
+			// execute some custom code before restarting
+			if (runBeforeRestart!= null) {
+				runBeforeRestart.run();
+			}
+			// exit
+			System.exit(0);
+		} catch (Exception e) {
+			// something went wrong
+			throw new IOException("Error while trying to restart the application", e);
+		}
+	}
+	
 }
