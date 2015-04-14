@@ -51,7 +51,7 @@ import antlrFiles.SQLParser.SelectAllContext;
 import antlrFiles.SQLParser.SelectContext;
 import antlrFiles.SQLParser.SelectSomeContext;
 import antlrFiles.SQLParser.SetIDsContext;
-import antlrFiles.SQLParser.ShowColumnsContext;
+import antlrFiles.SQLParser.ShowColumnsFromContext;
 import antlrFiles.SQLParser.ShowDBContext;
 import antlrFiles.SQLParser.ShowTablesContext;
 import antlrFiles.SQLParser.StartContext;
@@ -148,7 +148,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 				masterDatabases.getJSONArray("databases").put(newDB);				
 			} catch (JSONException e) {
 				// TODO Auto-generated catch block
-				GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE DATABASE statement. A json instruction was not completed.";
+				GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE DATABASE statement. A json instruction was not completed.\n\n";
 				return "error";
 			}
 			
@@ -160,11 +160,11 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			File masterFileDatabase = new File(folder + "\\masterDatabase.json");			
 			myTools.writeFile(masterFileDatabase, masterDatabase.toString());
 			
-			GUI.msgConfirm += "CREATE DATABASE query returned successfully.\n";
+			GUI.msgConfirm += "CREATE DATABASE query returned successfully.\n\n";
 			return "void";
 		}
 		else{
-			GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE DATABASE statement. Database whith that name already exist.";
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE DATABASE statement. Database whith that name already exist.\n\n";
 			return "error";
 		}
 		
@@ -186,11 +186,16 @@ public class Visitor extends SQLBaseVisitor<Object> {
 				// Search the database.
 				for (int i=0; i<databases.length(); i++){
 					JSONObject database = (JSONObject) databases.get(i);				
-					if (database.getString("name").equals(name)){						
-						database.put("name", newName);						
+					if (database.getString("name").equals(name)){
+						database.put("name", newName);
 						break;
 					}
-				}				
+				}
+				
+				// If the database to be altered is which is in use, change the database in use.
+				if (name.equals(GUI.currentDatabase)){
+					GUI.currentDatabase = newName;
+				}
 				
 				// This part goes files to a new directory and delete the old directory.
 				String newFolder = "databases\\" + newName;
@@ -199,17 +204,17 @@ public class Visitor extends SQLBaseVisitor<Object> {
 				
 				// Rewriting masterDatabases...
 				myTools.writeFile(masterDatabasesFile, masterDatabases.toString());
-				GUI.msgConfirm += "RENAME DATABASE query returned successfully.\n";
+				GUI.msgConfirm += "RENAME DATABASE query returned successfully.\n\n";
 				return "void";
 				
 			} catch (JSONException e) {
 				// TODO Auto-generated catch block
-				GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in RENAME DATABASE statement. A json instruction was not completed.";
+				GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in RENAME DATABASE statement. A json instruction was not completed.\n\n";
 				return "error";
 			}			
 		}
 		else{
-			GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in RENAME DATABASE statement. Referenced database does not exist.";
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in RENAME DATABASE statement. Referenced database does not exist.\n\n";
 			return "error";				
 		}
 	}
@@ -245,17 +250,17 @@ public class Visitor extends SQLBaseVisitor<Object> {
 				}
 				// Rewriting masterDatabases...
 				myTools.writeFile(masterDatabasesFile, masterDatabases.toString());
-				GUI.msgConfirm += "DROP DATABASE query returned successfully.\n";
+				GUI.msgConfirm += "DROP DATABASE query returned successfully.\n\n";
 				return "void";
 				
 			} catch (JSONException e) {
 				// TODO Auto-generated catch block
-				GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in DROP DATABASE statement. A json instruction was not completed.";
+				GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in DROP DATABASE statement. A json instruction was not completed.\n\n";
 				return "error";
 			}			
 		}
 		else{
-			GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in DROP DATABASE statement. Referenced database does not exist.";
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in DROP DATABASE statement. Referenced database does not exist.\n\n";
 			return "error";				
 		}
 				
@@ -274,7 +279,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			masterDatabases = new JSONObject(data);
 		} catch (JSONException e) {
 			// TODO Auto-generated catch block
-			GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in SHOW DATABASES statement. A json instruction was not completed.";
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in SHOW DATABASES statement. A json instruction was not completed.\n\n";
 			return "error";
 		}
 		
@@ -294,11 +299,11 @@ public class Visitor extends SQLBaseVisitor<Object> {
 		File folder = new File("databases\\" + name);
 		if (folder.exists()){
 			GUI.currentDatabase = name;
-			GUI.msgConfirm += "USE DATABASE query returned successfully.\n";
+			GUI.msgConfirm += "USE DATABASE query returned successfully.\n\n";
 			return "void";
 		}
 		else{
-			GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in USE DATABASE statement. Referenced database does not exist.";
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in USE DATABASE statement. Referenced database does not exist.\n\n";
 			return "error";				
 		}		
 	}
@@ -308,7 +313,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 		
 		// Verify that a database is using.
 		if (GUI.currentDatabase.equals("")){
-			GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. No database loaded.";
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. No database loaded.\n\n";
 			return "error";				
 		}
 				
@@ -330,13 +335,13 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			for (int i=0; i<tables.length(); i++){
 				JSONObject table = (JSONObject) tables.get(i);
 				if (table.getString("name").equals(tableName)){
-					GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Table whith that name already exist.";
+					GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Table whith that name already exist.\n\n";
 					return "error";					
 				}
 			}
 		} catch (JSONException e1) {
 			// TODO Auto-generated catch block
-			GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. A json instruction was not completed.";
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. A json instruction was not completed.\n\n";
 			return "error";
 		}
 		
@@ -357,14 +362,14 @@ public class Visitor extends SQLBaseVisitor<Object> {
 				if (type.contains("char")){
 					int num = Integer.parseInt(type.split(":")[1]);					
 					if (num < 1){
-						GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in VAR type statement. The length of a CHAR type variable, must be greater than zero.";
+						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in VAR type statement. The length of a CHAR type variable, must be greater than zero.\n\n";
 						return "error";
 					}
 				}
 				
 				// Check repeated columns.
 				if (columnsAux.contains(name)){
-					GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Repeated columns were found.";
+					GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Repeated columns were found.\n\n";
 					return "error";
 				}
 				
@@ -391,7 +396,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			ArrayList<Object[]> pks = (ArrayList<Object[]>)constraints[0];
 			// There must be only one primary key.
 			if (pks.size() > 1){
-				GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. There must be only one primary key.";
+				GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. There must be only one primary key.\n\n";
 				return "error";				
 			}
 			
@@ -399,11 +404,11 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			JSONArray jsonPKColumns = new JSONArray();
 			for (String col: (ArrayList<String>) pks.get(0)[1]){
 				if (!columnsAux.contains(col)){
-					GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Column referenced by PRIMARY KEY does not exist.";
+					GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Column referenced by PRIMARY KEY does not exist.\n\n";
 					return "error";
 				}
 				if (myTools.jsonArrayContain(jsonPKColumns, col)){
-					GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Repeated columns were found in PRIMARY KEY.";
+					GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Repeated columns were found in PRIMARY KEY.\n\n";
 					return "error";
 				}
 				jsonPKColumns.put(col);					
@@ -425,7 +430,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			for (Object[] fk: (ArrayList<Object[]>)constraints[1]){
 				
 				if (fkNames.contains(fk[0])){
-					GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. FOREIGN KEY whith that name already exist.";
+					GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. FOREIGN KEY whith that name already exist.\n\n";
 					return "error";
 				}
 				jsonFK.put("fkName", fk[0]);
@@ -434,7 +439,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 				JSONArray jsonFKLocalColumns = new JSONArray();
 				for (String col: (ArrayList<String>)fk[1]){
 					if (!columnsAux.contains(col)){
-						GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Column referenced by FOREIGN KEY does not exist.";
+						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Column referenced by FOREIGN KEY does not exist.\n\n";
 						return "error";
 					}
 					jsonFKLocalColumns.put(col);
@@ -455,7 +460,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 					}
 				}
 				if (!tableRefExist){
-					GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Table referenced by a FOREIGN KEY does not exist.";
+					GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Table referenced by a FOREIGN KEY does not exist.\n\n";
 					return "error";
 				}
 				
@@ -466,7 +471,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 				for (String col: (ArrayList<String>)fk[3]){
 					// Verify that this column for FOREIGN KEY exists in the referenced table.					
 					if (myTools.jsonArrayContain(jsonFKRefColumns, col)){						
-						GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Repeated columns were found in FOREIGN KEY.";
+						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Repeated columns were found in FOREIGN KEY.\n\n";
 						return "error";
 					}					
 					jsonFKRefColumns.put(col);					
@@ -478,7 +483,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 						String fkRefColumn = jsonFKRefColumns.getString(i);
 						// Verify that the referenced columns exist in this table.
 						if (!myTools.jsonArrayContain(jsonFKLocalColumns, fkRefColumn)){
-							GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. FOREIGN KEY columns are incompatible.";
+							GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. FOREIGN KEY columns are incompatible.\n\n";
 							return "error";
 						}
 						for (int j=0; j<jsonColumns.length(); j++){
@@ -488,7 +493,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 								items.add("name");
 								items.add("type");
 								if (!myTools.jsonArrayContain(jsonTableRefColumns, jsonColumn, items)){
-									GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Column referenced by FOREIGN KEY does not exist in referenced table.";
+									GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. Column referenced by FOREIGN KEY does not exist in referenced table.\n\n";
 									return "error";
 								}
 								else{
@@ -499,7 +504,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 					}
 				}
 				else{
-					GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. FOREIGN KEY columns are incompatible.";
+					GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. FOREIGN KEY columns are incompatible.\n\n";
 					return "error";
 				}
 				
@@ -523,7 +528,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 				String checkName = check[0];
 				String checkExpression = check[1];
 				if (checkNames.contains(checkName)){
-					GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. CHECK whith that name already exist.";
+					GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. CHECK whith that name already exist.\n\n";
 					return "error";
 				}
 				
@@ -532,7 +537,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 				ArrayList<String> ids = (ArrayList<String>)expression[1];
 				for (String id: ids){
 					if (!columnsAux.contains(id)){
-						GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. ID referenced by CHECK expression does not exist.";
+						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. ID referenced by CHECK expression does not exist.\n\n";
 						return "error";						
 					}
 				}
@@ -549,26 +554,44 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			// ************ Creating the json Table ************
 			jsonTableSchema.put("name", tableName);
 			jsonTableSchema.put("columns", jsonColumns);
-			jsonTableSchema.put("constrainst", jsonConstraints);
+			jsonTableSchema.put("constraints", jsonConstraints);
 			jsonTableSchema.put("checks", jsonChecks);
+			jsonTableSchema.put("numRegisters", 0);
 			
 			tables.put(jsonTableSchema);
 			
-			
+			// Rewriting masterDatabase and creating table File.
 			JSONObject jsonTable = new JSONObject("{\"data\":[]}");				
 			myTools.writeFile(masterDatabaseFile, masterDatabase.toString());
 			File tableFile = new File("databases\\"+ GUI.currentDatabase + "\\" + tableName + ".json");			
 			myTools.writeFile(tableFile, jsonTable.toString());
-						
+			
+			// Add one to atribute numTables in masterDatabases for current database.
+			File masterDatabasesFile = new File("databases\\masterDatabases.json");
+			data = myTools.readFile(masterDatabasesFile);
+			JSONObject masterDatabases = new JSONObject(data);					
+			JSONArray databases = masterDatabases.getJSONArray("databases");
+			// Search the database.
+			for (int i=0; i<databases.length(); i++){
+				JSONObject database = (JSONObject) databases.get(i);				
+				if (database.getString("name").equals(GUI.currentDatabase)){						
+					database.put("numTables", database.getInt("numTables")+1);
+					break;
+				}
+			}
+			
+			// Rewriting masterDatabases...
+			myTools.writeFile(masterDatabasesFile, masterDatabases.toString());
+		
 			GUI.msgConfirm += "CREATE TALBE query returned successfully.\n\n";			
-			GUI.msgConfirm += myTools.convertToContentJsonView(jsonTableSchema.toString());
+			GUI.msgConfirm += myTools.convertToContentJsonView(jsonTableSchema.toString()) + "\n\n";
 			return "void";
 			
 			
 		} catch (JSONException e) {
 			System.err.println(e.getMessage());
 			// TODO Auto-generated catch block
-			GUI.msgError += "\n" + "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. A json instruction was not completed.";
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in CREATE TABLE statement. A json instruction was not completed.\n\n";
 			return "error";
 
 		}
@@ -815,20 +838,218 @@ public class Visitor extends SQLBaseVisitor<Object> {
 		// TODO Auto-generated method stub
 		return ctx.getChild(0).getText();
 	}
-	
-	
-	
-	
-	
-	
-	
+
+	@Override
+	public Object visitAlterTableRename(AlterTableRenameContext ctx) {		
+		// Verify that a database is using.
+		if (GUI.currentDatabase.equals("")){
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in RENAME TABLE statement. No database loaded.\n\n";
+			return "error";				
+		}		
+
+		// Verify that referenced table exist.		
+		String tableName = ctx.ID(0).getText();
+		String newTableName = ctx.ID(1).getText();
+		File tableFile = new File("databases\\"+ GUI.currentDatabase + "\\" + tableName + ".json");
+		if (!tableFile.exists()){
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in RENAME TABLE statement. Referenced table does not exist.\n\n";
+			return "error";	
+		}
+		
+		// If table exist, load masterDatabase to find it.
+		File masterDatabaseFile = new File("databases\\"+ GUI.currentDatabase + "\\masterDatabase.json");
+		String data = myTools.readFile(masterDatabaseFile);
+		JSONObject masterDatabase;
+		JSONArray tables;
+
+		try {
+			masterDatabase = new JSONObject(data);
+			tables = masterDatabase.getJSONArray("tables");
+			// Searching table...
+			for (int i=0; i<tables.length(); i++){
+				JSONObject table = (JSONObject) tables.get(i);
+				if (table.getString("name").equals(tableName)){
+					table.put("name", newTableName);
+					break;
+				}
+			}
+			// Rewriting masterDatabases...		
+			myTools.writeFile(masterDatabaseFile, masterDatabase.toString());
+			File newTableFile = new File("databases\\"+ GUI.currentDatabase + "\\" + newTableName + ".json");
+			// Rename table file.
+			tableFile.renameTo(newTableFile);
+			GUI.msgConfirm += "RENAME TABLE query returned successfully.\n\n";
+			return "void";
+			
+		} catch (JSONException e1) {
+			// TODO Auto-generated catch block
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in RENAME TABLE statement. A json instruction was not completed.\n\n";
+			return "error";
+		}
+	}
 	
 	@Override
-	public Object visitShowColumns(ShowColumnsContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
+	public Object visitDropTable(DropTableContext ctx) {
+		// Verify that a database is using.
+		if (GUI.currentDatabase.equals("")){
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in DROP TABLE statement. No database loaded.\n\n";
+			return "error";				
+		}
+		
+		// Verify that referenced table exist.
+		String tableName = ctx.ID().getText();
+		File tableFile = new File("databases\\"+ GUI.currentDatabase + "\\" + tableName + ".json");
+		if (!tableFile.exists()){
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in DROP TABLE statement. Referenced table does not exist.\n\n";
+			return "error";	
+		}
+		
+		// If table exist, load masterDatabase to remove it.
+		File masterDatabaseFile = new File("databases\\"+ GUI.currentDatabase + "\\masterDatabase.json");
+		String data = myTools.readFile(masterDatabaseFile);
+		JSONObject masterDatabase;
+		JSONArray tables;
+		try {
+			masterDatabase = new JSONObject(data);
+			tables = masterDatabase.getJSONArray("tables");
+			// Searching table...
+			for (int i=0; i<tables.length(); i++){
+				JSONObject table = (JSONObject) tables.get(i);
+				if (table.getString("name").equals(tableName)){
+					// Confirm the delete action.
+					String msgConfirm = "¿Borrar tabla " + tableName + " con " + table.getInt("numRegisters") + " registros?";
+					int option = JOptionPane.showConfirmDialog(null, msgConfirm);
+			        if(option == JOptionPane.YES_OPTION){
+			        	// Delete database in masterDatabases and directory also.
+			        	tables.remove(i);
+			        	tableFile.delete();
+			        	break;
+			        }			        
+			        GUI.msgConfirm += "DROP TABLE query canceled.\n\n";
+		        	return "void";
+				}
+			}
+			
+			// Rewriting masterDatabases...
+			myTools.writeFile(masterDatabaseFile, masterDatabase.toString());
+			
+			
+			// Substract one to atribute numTables in masterDatabases for current database.
+			File masterDatabasesFile = new File("databases\\masterDatabases.json");
+			data = myTools.readFile(masterDatabasesFile);
+			JSONObject masterDatabases = new JSONObject(data);					
+			JSONArray databases = masterDatabases.getJSONArray("databases");
+			// Search the database.
+			for (int i=0; i<databases.length(); i++){
+				JSONObject database = (JSONObject) databases.get(i);				
+				if (database.getString("name").equals(GUI.currentDatabase)){						
+					database.put("numTables", database.getInt("numTables")-1);
+					break;
+				}
+			}
+			
+			// Rewriting masterDatabases...
+			myTools.writeFile(masterDatabasesFile, masterDatabases.toString());
+			
+			
+			GUI.msgConfirm += "DROP TABLE query returned successfully.\n\n";
+			return "void";
+			
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in DROP TABLE statement. A json instruction was not completed.\n\n";
+			return "error";
+		}
+				
+	}
+	
+	@Override
+	public Object visitShowTables(ShowTablesContext ctx) {
+		// Verify that a database is using.
+		if (GUI.currentDatabase.equals("")){
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in SHOW TABLES statement. No database loaded.\n\n";
+			return "error";				
+		}
+		
+		// Load masterDatabase.
+		File masterDatabaseFile = new File("databases\\"+ GUI.currentDatabase + "\\masterDatabase.json");
+		String data = myTools.readFile(masterDatabaseFile);
+		JSONObject masterDatabase;
+		JSONArray tables;
+		try {
+			masterDatabase = new JSONObject(data);
+			tables = masterDatabase.getJSONArray("tables");
+			String view = myTools.convertToContentJsonView(tables.toString());
+			GUI.msgConfirm += "SHOW TABLES query returned successfully.\n\nResult of the query: " + tables.length() + " tables were found.\n";
+			GUI.msgConfirm += view + "\n\n";
+			return "void";
+		}
+		catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in SHOW TABLES statement. A json instruction was not completed.\n\n";
+			return "error";
+		}
 	}
 
+	@Override
+	public Object visitShowColumnsFrom(ShowColumnsFromContext ctx) {
+		// Verify that a database is using.
+		if (GUI.currentDatabase.equals("")){
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in SHOW COLUMNS FROM statement. No database loaded.\n\n";
+			return "error";
+		}
+		
+		// Verify that referenced table exist.
+		String tableName = ctx.ID().getText();
+		File tableFile = new File("databases\\"+ GUI.currentDatabase + "\\" + tableName + ".json");
+		if (!tableFile.exists()){
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in SHOW COLUMNS FROM statement. Referenced table does not exist.\n\n";
+			return "error";	
+		}
+		
+		// If table exist, load masterDatabase to remove it.
+		File masterDatabaseFile = new File("databases\\"+ GUI.currentDatabase + "\\masterDatabase.json");
+		String data = myTools.readFile(masterDatabaseFile);
+		JSONObject masterDatabase;
+		JSONArray tables;
+		JSONObject result;
+		try {
+			masterDatabase = new JSONObject(data);
+			tables = masterDatabase.getJSONArray("tables");
+			// Searching table...
+			for (int i=0; i<tables.length(); i++){
+				JSONObject table = (JSONObject) tables.get(i);
+				if (table.getString("name").equals(tableName)){
+					result = new JSONObject();
+					JSONArray columns = table.getJSONArray("columns");
+					JSONObject constraints = table.getJSONObject("constraints");
+					
+					result.put("columns", columns);
+					result.put("constrainst",constraints);
+					
+					String view = myTools.convertToContentJsonView(result.toString());
+			        GUI.msgConfirm += "SHOW COLUMNS FROM query returned successfully.\n\nResult of the query:\n\n";
+			        GUI.msgConfirm += view + "\n\n";
+		        	break;
+				}
+			}
+			return "void";
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] : Exception in SHOW COLUMNS FROM statement. A json instruction was not completed.\n\n";
+			return "error";
+		}
+	}
+
+	
+	
+	
+	
+	
+	
 	@Override
 	public Object visitSelectSome(SelectSomeContext ctx) {
 		// TODO Auto-generated method stub
@@ -843,18 +1064,6 @@ public class Visitor extends SQLBaseVisitor<Object> {
 
 	@Override
 	public Object visitSelect(SelectContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Object visitDropTable(DropTableContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Object visitAlterTableRename(AlterTableRenameContext ctx) {
 		// TODO Auto-generated method stub
 		return null;
 	}
@@ -879,12 +1088,6 @@ public class Visitor extends SQLBaseVisitor<Object> {
 
 	@Override
 	public Object visitActionAddColumn(ActionAddColumnContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Object visitShowTables(ShowTablesContext ctx) {
 		// TODO Auto-generated method stub
 		return null;
 	}

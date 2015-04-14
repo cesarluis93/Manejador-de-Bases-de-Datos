@@ -62,8 +62,8 @@ public class Tools {
 	
 	/**
 	 * Metodo para visualizar un archivo .json con tabulaciones.
-	 * @param data
-	 * @return
+	 * @param data - Contenido del archivo json.
+	 * @return Contenido tabulada.
 	 */
 	public String convertToContentJsonView(String data){
 		String toshow = "", tabs;
@@ -98,7 +98,7 @@ public class Tools {
 	
 	/**
 	 * Elimina un directorio y su contenido.
-	 * @param directory
+	 * @param directory - Directorio a eliminar.
 	 */
 	public void deletteDirectory(File directory){		
 		File[] files = directory.listFiles();
@@ -111,6 +111,11 @@ public class Tools {
 		directory.delete();
 	}
 	
+	/**
+	 * Copia los archivos de un directorio a otro.
+	 * @param source - Directorio origen.
+	 * @param target - Directorio destino.
+	 */
     public void copyFiles(String source, String target){
 		File folderSource = new File(source);
 		File newFolder = new File(target);		

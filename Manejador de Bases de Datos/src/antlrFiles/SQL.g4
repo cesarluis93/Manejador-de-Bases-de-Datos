@@ -92,7 +92,7 @@ ddlInstruction	: 	CREATE DATABASE ID 						#createDB
 				| 	ALTER TABLE ID (action)*				#alterTableAccion
 				| 	DROP TABLE ID							#dropTable
 				| 	SHOW TABLES								#showTables
-				| 	SHOW COLUMNS FROM ID					#showColumns
+				| 	SHOW COLUMNS FROM ID					#showColumnsFrom
 				;
 				
 columnsTable	:	(columnTable (',' columnTable)* )? ;
