@@ -29,6 +29,7 @@ INT		: ('i'|'I')('n'|'N')('t'|'T');
 FLOAT	: ('f'|'F')('l'|'L')('o'|'O')('a'|'A')('t'|'T');
 DATE	: ('d'|'D')('a'|'A')('t'|'T')('e'|'E');
 CHAR	: ('c'|'C')('h'|'H')('a'|'A')('r'|'R');
+BOOLEAN	: ('b'|'B')('o'|'O')('o'|'O')('l'|'L')('e'|'E')('a'|'A')('n'|'N');
 TRUE 	: ('t'|'T')('r'|'R')('u'|'U')('e'|'E');
 FALSE 	: ('f'|'F')('a'|'A')('l'|'L')('s'|'S')('e'|'E');
 
@@ -103,6 +104,7 @@ type 	: 	INT						#typeInt
 		| 	FLOAT					#typeFloat
 		| 	DATE					#typeDate
 		| 	CHAR '(' NUM ')'		#typeChar
+		|	BOOLEAN					#typeBoolean
 		;
 
 constraints		: 	constraintType (',' constraintType)* ;
@@ -135,8 +137,8 @@ unaryExpression	:	varExpression					#variableExpression
 			 	|	NOT '(' expression ')'			#notExpression
 		 		; 
 
-varExpression	:	ID
-				|	'(' expression ')'
+varExpression	:	ID ('.' ID)?					#varExpressionID
+				|	'(' expression ')'				#varExpressionParentesis
 				;
 		
 orOperator 			:	OR ;
@@ -151,7 +153,18 @@ action 		: ADD COLUMN ID type CONSTRAINT constraints			#actionAddColumn
 			| DROP CONSTRAINT ID								#actionDropConstrait
 			;
 
+value 	: 	integerValue
+		| 	floatValue
+		| 	dateValue
+		| 	charValue
+		|	booleanValue
+		;
 
+integerValue	:	NUM	;
+floatValue		: 	FLOATNUM ;
+dateValue		:  	DATED ;
+charValue		:  	CHARS ;
+booleanValue	:	TRUE | FALSE ;
 
 
 //************************** Grammar for DML **************************
@@ -167,17 +180,6 @@ dmlInstruction 	:	INSERT INTO ID (insertColumns)? VALUES insertValues					#inser
 insertColumns	:	'(' ID (',' ID)* ')' ;
 
 insertValues	:	'(' (value (',' value)* ) ')' ;
-
-value 	: 	integerValue
-		| 	floatValue
-		| 	dateValue
-		| 	charValue
-		;
-
-integerValue	:	NUM	;
-floatValue		: 	FLOATNUM ;
-dateValue		:  	DATED ;
-charValue		:  	CHARS ;
 
 
 assignments	:	asign (',' asign)* ;
