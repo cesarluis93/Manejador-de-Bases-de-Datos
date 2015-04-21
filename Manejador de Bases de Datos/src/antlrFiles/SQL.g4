@@ -1,8 +1,9 @@
 //************************** SQL Grammar **************************
 grammar SQL;
 
-fragment Letter : ('a'..'z' | 'A'..'Z');
-fragment Digit :'0'..'9' ;
+fragment Letter 	: ('a'..'z' | 'A'..'Z');
+fragment Digit 		:'0'..'9' ;
+
 
 //************************** Words reserved for DDL **************************
 
@@ -51,7 +52,7 @@ COLUMNS			: ('c'|'C')('o'|'O')('l'|'L')('u'|'U')('m'|'M')('n'|'N')('s'|'S');
 
 FLOATNUM 	: ('-')?(NUM)'.'(NUM);
 DATED 		: '\'' Digit Digit Digit Digit '-' Digit Digit '-' Digit Digit '\'';
-CHARS 		: '\''(Letter)*'\'';
+CHARS 		: '\''(Letter|Digit)(Letter|Digit|' '|'-'|'_')*'\'';
 INSERT 		: ('i'|'I')('n'|'N')('s'|'S')('e'|'E')('r'|'R')('t'|'T');
 INTO		: ('i'|'I')('n'|'N')('t'|'T')('o'|'O');
 VALUES 		: ('v'|'V')('a'|'A')('l'|'L')('u'|'U')('e'|'E')('s'|'S');
@@ -67,9 +68,9 @@ ASC 		: ('a'|'A')('s'|'S')('c'|'C');
 DESC 		: ('d'|'D')('e'|'E')('s'|'S')('c'|'C');
 
 
-ID		: Letter (Letter | Digit)*;
+ID		: Letter (Letter | Digit|'_')*;
 NUM		: ('-')? Digit(Digit)*;
-
+				
 Comments: '-''-' ~('\r' | '\n' )*  -> channel(HIDDEN);
 WhitespaceDeclaration : [\t\r\n\f ]+ -> skip ;
 
@@ -88,9 +89,9 @@ ddlInstruction	: 	CREATE DATABASE ID 						#createDB
 				| 	DROP DATABASE ID 						#dropDB
 				| 	SHOW DATABASES							#showDB
 				| 	USE DATABASE ID							#useDB
-				| 	CREATE TABLE ID '(' columnsTable CONSTRAINT constraints ')'	#createTable
+				| 	CREATE TABLE ID '(' columnsTable (',' CONSTRAINT constraints)? ')'	#createTable
 				| 	ALTER TABLE ID RENAME TO ID				#alterTableRename
-				| 	ALTER TABLE ID (action)*				#alterTableAccion
+				| 	ALTER TABLE ID actions					#alterTableAction
 				| 	DROP TABLE ID							#dropTable
 				| 	SHOW TABLES								#showTables
 				| 	SHOW COLUMNS FROM ID					#showColumnsFrom
@@ -137,7 +138,7 @@ unaryExpression	:	varExpression					#variableExpression
 			 	|	NOT '(' expression ')'			#notExpression
 		 		; 
 
-varExpression	:	ID ('.' ID)?					#varExpressionID
+varExpression	:	ID								#varExpressionID
 				|	'(' expression ')'				#varExpressionParentesis
 				;
 		
@@ -146,8 +147,9 @@ andOperator			:	AND ;
 equalOperator		:	EQ | NOTEQ ;
 relationOperator	: 	LESSTH | GREATTH | LESSEQ | GREATEQ ;
 
+actions		: action (',' action)* ;
 
-action 		: ADD COLUMN ID type CONSTRAINT constraints			#actionAddColumn
+action 		: ADD COLUMN ID type /*CONSTRAINT constraints*/		#actionAddColumn
 			| ADD CONSTRAINT constraintType						#actionAddConstraint
 			| DROP COLUMN ID									#actionDropColumn
 			| DROP CONSTRAINT ID								#actionDropConstrait
@@ -171,24 +173,25 @@ booleanValue	:	TRUE | FALSE ;
 
 dmlDeclaration 	:	dmlInstruction ';' ;
 
-dmlInstruction 	:	INSERT INTO ID (insertColumns)? VALUES insertValues					#insert
+dmlInstruction 	:	INSERT INTO ID (insertColumns)? VALUES '(' insertValues ')'			#insert
 				| 	UPDATE ID SET assignments (WHERE expression)?						#update
-				| 	DELETE FROM ID (WHERE expression)?									#delette
+				| 	DELETE FROM ID (WHERE expression)?									#delete
 				|	SELECT selectColumns FROM ID (WHERE expression)? (ORDER BY order)?	#select
 				;
 
 insertColumns	:	'(' ID (',' ID)* ')' ;
 
-insertValues	:	'(' (value (',' value)* ) ')' ;
+insertValues	:	value (',' value)* ;
 
 
 assignments	:	asign (',' asign)* ;
 
 asign	:	ID '=' value ;
 
-selectColumns	: '*'					#selectAll
-				| (ID (',' ID)*)		#selectSome
+selectColumns	: '*'
+				| setIDs
 				;
+
 	
 order	:	ID (',' ID)* (ASC | DESC)?;
 

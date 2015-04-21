@@ -1,13 +1,18 @@
 package manejador;
 
 import java.io.File;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Stack;
 
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+import javax.script.ScriptException;
 import javax.swing.JOptionPane;
 
 import org.antlr.v4.runtime.Recognizer;
+import org.antlr.v4.runtime.RuleContext;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.RuleNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
@@ -18,10 +23,12 @@ import org.json.JSONObject;
 import antlrFiles.SQLBaseVisitor;
 import antlrFiles.SQLParser.ActionAddColumnContext;
 import antlrFiles.SQLParser.ActionAddConstraintContext;
+import antlrFiles.SQLParser.ActionContext;
 import antlrFiles.SQLParser.ActionDropColumnContext;
 import antlrFiles.SQLParser.ActionDropConstraitContext;
+import antlrFiles.SQLParser.ActionsContext;
 import antlrFiles.SQLParser.AlterDBContext;
-import antlrFiles.SQLParser.AlterTableAccionContext;
+import antlrFiles.SQLParser.AlterTableActionContext;
 import antlrFiles.SQLParser.AlterTableRenameContext;
 import antlrFiles.SQLParser.AndExpressionContext;
 import antlrFiles.SQLParser.BooleanValueContext;
@@ -37,7 +44,7 @@ import antlrFiles.SQLParser.CreateDBContext;
 import antlrFiles.SQLParser.CreateTableContext;
 import antlrFiles.SQLParser.DateValueContext;
 import antlrFiles.SQLParser.DdlDeclarationContext;
-import antlrFiles.SQLParser.DeletteContext;
+import antlrFiles.SQLParser.DeleteContext;
 import antlrFiles.SQLParser.DmlDeclarationContext;
 import antlrFiles.SQLParser.DropDBContext;
 import antlrFiles.SQLParser.DropTableContext;
@@ -45,19 +52,21 @@ import antlrFiles.SQLParser.EqualExpressionContext;
 import antlrFiles.SQLParser.EqualOperatorContext;
 import antlrFiles.SQLParser.ExpressionContext;
 import antlrFiles.SQLParser.FloatValueContext;
+import antlrFiles.SQLParser.InsertColumnsContext;
 import antlrFiles.SQLParser.InsertContext;
+import antlrFiles.SQLParser.InsertValuesContext;
 import antlrFiles.SQLParser.IntegerValueContext;
 import antlrFiles.SQLParser.NotExpressionContext;
 import antlrFiles.SQLParser.RelationExpressionContext;
 import antlrFiles.SQLParser.RelationOperatorContext;
-import antlrFiles.SQLParser.SelectAllContext;
+import antlrFiles.SQLParser.SelectColumnsContext;
 import antlrFiles.SQLParser.SelectContext;
-import antlrFiles.SQLParser.SelectSomeContext;
 import antlrFiles.SQLParser.SetIDsContext;
 import antlrFiles.SQLParser.ShowColumnsFromContext;
 import antlrFiles.SQLParser.ShowDBContext;
 import antlrFiles.SQLParser.ShowTablesContext;
 import antlrFiles.SQLParser.StartContext;
+import antlrFiles.SQLParser.TypeBooleanContext;
 import antlrFiles.SQLParser.TypeCharContext;
 import antlrFiles.SQLParser.TypeDateContext;
 import antlrFiles.SQLParser.TypeFloatContext;
@@ -66,7 +75,6 @@ import antlrFiles.SQLParser.UpdateContext;
 import antlrFiles.SQLParser.UseDBContext;
 import antlrFiles.SQLParser.ValueContext;
 import antlrFiles.SQLParser.ValueExpressionContext;
-import antlrFiles.SQLParser.VarExpressionContext;
 import antlrFiles.SQLParser.VarExpressionIDContext;
 import antlrFiles.SQLParser.VarExpressionParentesisContext;
 import antlrFiles.SQLParser.VariableExpressionContext;
@@ -74,18 +82,28 @@ import antlrFiles.SQLParser.VariableExpressionContext;
 
 public class Visitor extends SQLBaseVisitor<Object> {
 	
-	Tools myTools;
-	boolean selecting;
-	ArrayList<String> currentTables;
-	ArrayList<Expression> currentColumns;
-	Stack<String> stack;
+	private Tools myTools;
+	private boolean selecting;
+	private ArrayList<String> currentTables;
+	private ArrayList<Expression> currentColumns;
+	private Stack<String> stack;
+	private JSONArray jsonCurrentData;
+	private JSONArray jsonDataToInsert;	
+	private JSONObject jsonTable;
+	private String nextInstruction;
+	private int counter;
 	
 	public Visitor(){
 		myTools = new Tools();
-		selecting = false;
+		selecting = false;		
 		currentTables = new ArrayList<String>();
 		currentColumns = new ArrayList<Expression>();
 		stack = new Stack<String>();
+		jsonDataToInsert = null;
+		jsonCurrentData = null;
+		jsonTable = null;
+		nextInstruction = "";
+		counter = 0;
 	}
 
 	@Override
@@ -114,9 +132,12 @@ public class Visitor extends SQLBaseVisitor<Object> {
 	public Object visitStart(StartContext ctx){
 		stack.push("start");
 		for (int i=0; i<ctx.getChildCount(); i++){
-			Object newDecl = visit(ctx.getChild(i));
-			if (newDecl.equals(null))
+			nextInstruction = (i < ctx.getChildCount()-1)? ctx.getChild(i+1).getChild(0).getChild(0).getText(): "";
+			String newDecl = (String)visit(ctx.getChild(i));
+			if (newDecl.equals("error")){
+				stack.pop();
 				return "error";
+			}
 		}
 		stack.pop();
 		return "void";
@@ -125,10 +146,10 @@ public class Visitor extends SQLBaseVisitor<Object> {
 	@Override
 	public Object visitDdlDeclaration(DdlDeclarationContext ctx) {
 		// TODO Auto-generated method stub		
-		stack.push("ddlDeclaration");
-		Object newDecl = visit(ctx.ddlInstruction());
+		stack.push("ddlDeclaration");			
+		String newDecl = (String)visit(ctx.ddlInstruction());
 		stack.pop();
-		if (newDecl.equals(null))
+		if (newDecl.equals("error"))
 			return "error";
 				
 		return "void";
@@ -138,9 +159,9 @@ public class Visitor extends SQLBaseVisitor<Object> {
 	public Object visitDmlDeclaration(DmlDeclarationContext ctx) {
 		// TODO Auto-generated method stub
 		stack.push("dmlDeclaration");
-		Object newDecl = visit(ctx.dmlInstruction());
+		String newDecl = (String)visit(ctx.dmlInstruction());
 		stack.pop();
-		if (newDecl.equals(null))
+		if (newDecl.equals("error"))
 			return "error";
 	
 		return "void";
@@ -150,8 +171,8 @@ public class Visitor extends SQLBaseVisitor<Object> {
 	public Object visitCreateDB(CreateDBContext ctx) {
 		stack.push("createDB");
 		// TODO Auto-generated method stub
-		String dataBaseName = ctx.ID().getText();
-		File folder = new File("databases\\" + dataBaseName);				
+		String databaseName = ctx.ID().getText();
+		File folder = new File("databases\\" + databaseName);				
 		if (!folder.exists()){
 			// Load existing data bases.
 			File masterDatabasesFile = new File("databases\\masterDatabases.json");
@@ -160,7 +181,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			try {
 				// Put a new database to master database.
 				masterDatabases = new JSONObject(data);
-				JSONObject newDB = new JSONObject("{\"name\":\"" + dataBaseName + "\",\"numTables\":" + 0 + "}");
+				JSONObject newDB = new JSONObject("{\"name\":\"" + databaseName + "\",\"numTables\":" + 0 + "}");
 				masterDatabase = new JSONObject("{\"tables\":[]}");
 				masterDatabases.getJSONArray("databases").put(newDB);				
 			} catch (JSONException e) {
@@ -179,6 +200,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			myTools.writeFile(masterFileDatabase, masterDatabase.toString());
 			
 			GUI.msgConfirm += "CREATE DATABASE query returned successfully.\n\n";
+			GUI.addDatabaseToJTree(databaseName);
 			stack.pop();
 			return "void";
 		}
@@ -194,11 +216,11 @@ public class Visitor extends SQLBaseVisitor<Object> {
 	public Object visitAlterDB(AlterDBContext ctx) {
 		stack.push("alterDB");
 		// TODO Auto-generated method stub
-		String name = ctx.ID(0).getText();
-		String newName = ctx.ID(1).getText();
-		File folder = new File("databases\\" + name);
+		String databaseName = ctx.ID(0).getText();
+		String newDatabaseName = ctx.ID(1).getText();
+		File folder = new File("databases\\" + databaseName);
 		if (folder.exists()){
-			File newFolder = new File ("databases\\" + newName);{
+			File newFolder = new File ("databases\\" + newDatabaseName);{
 				if (newFolder.exists()){
 					GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in RENAME DATABASE statement. Database whith that name already exist.\n\n";
 					stack.pop();
@@ -214,25 +236,26 @@ public class Visitor extends SQLBaseVisitor<Object> {
 				// Search the database.
 				for (int i=0; i<databases.length(); i++){
 					JSONObject database = (JSONObject) databases.get(i);				
-					if (database.getString("name").equals(name)){
-						database.put("name", newName);
+					if (database.getString("name").equals(databaseName)){
+						database.put("name", newDatabaseName);
 						break;
 					}
 				}
 				
 				// If the database to be altered is which is in use, change the database in use.
-				if (name.equals(GUI.currentDatabase)){
-					GUI.currentDatabase = newName;
+				if (databaseName.equals(GUI.currentDatabase)){
+					GUI.currentDatabase = newDatabaseName;
 				}
 				
 				// This part goes files to a new directory and delete the old directory.
-				String newFolderPath = "databases\\" + newName;
+				String newFolderPath = "databases\\" + newDatabaseName;
 				myTools.copyFiles(folder.toString(), newFolderPath);
 				folder.delete();
 				
 				// Rewriting masterDatabases...
 				myTools.writeFile(masterDatabasesFile, masterDatabases.toString());
 				GUI.msgConfirm += "RENAME DATABASE query returned successfully.\n\n";
+				GUI.renameDatabaseOnJTree(databaseName, newDatabaseName);
 				stack.pop();
 				return "void";
 				
@@ -254,8 +277,8 @@ public class Visitor extends SQLBaseVisitor<Object> {
 	public Object visitDropDB(DropDBContext ctx) {
 		stack.push("dropDB");
 		// TODO Auto-generated method stub
-		String name = ctx.ID().getText();
-		File folder = new File("databases\\" + name);
+		String databaseName = ctx.ID().getText();
+		File folder = new File("databases\\" + databaseName);
 		if (folder.exists()){
 			// Load existing databases.
 			File masterDatabasesFile = new File("databases\\masterDatabases.json");
@@ -263,20 +286,35 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			try {
 				JSONObject masterDatabases = new JSONObject(data);
 				JSONArray databases = masterDatabases.getJSONArray("databases");
-				// Search de database.
+				
+				// Search the database.
 				for (int i=0; i<databases.length(); i++){
 					JSONObject database = (JSONObject) databases.get(i);					
-					if (database.getString("name").equals(name)){
+					if (database.getString("name").equals(databaseName)){
+						// Find the number of records in database.
+						File masterDatabaseFile = new File("databases\\" + databaseName + "\\masterDatabase.json");
+						String masterDatabase = myTools.readFile(masterDatabaseFile);
+						JSONObject jsonMasterDataBase = new JSONObject(masterDatabase);
+						JSONArray jsonTables = jsonMasterDataBase.getJSONArray("tables");
+						int numRecords = 0;
+						for (int j=0; j<jsonTables.length(); j++){
+							JSONObject jsonTable = jsonTables.getJSONObject(j);
+							int numRegistersTable = jsonTable.getInt("numRegisters");
+							numRecords += numRegistersTable;
+						}
 						// Confirm the delete action.
-						String msgConfirm = "¿Borrar base de datos " + name + " con " + database.getInt("numTables")+ " registros?";
+						String msgConfirm = "¿Borrar base de datos " + databaseName + " con " + numRecords + " registros?";
 						int option = JOptionPane.showConfirmDialog(null, msgConfirm);
 				        if(option == JOptionPane.YES_OPTION){
 				        	// Delete database in masterDatabases and directory also.
 				        	databases.remove(i);
-				        	myTools.deletteDirectory(folder);				        	
+				        	myTools.deletteDirectory(folder);
+				        	if (databaseName.equals(GUI.currentDatabase))
+				        		GUI.currentDatabase = "";
 				        	break;
 				        }
 				        GUI.msgConfirm += "DROP DATABASE query canceled.\n";
+				        GUI.dropDatabaseOnJTree(databaseName);
 				        stack.pop();
 			        	return "void";
 					}
@@ -289,7 +327,8 @@ public class Visitor extends SQLBaseVisitor<Object> {
 				
 			} catch (JSONException e) {
 				// TODO Auto-generated catch block
-				GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in DROP DATABASE statement. A json instruction was not completed.\n\n";
+				e.printStackTrace();
+				GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in DROP DATABASE statement. A json instruction was not completed.\n\n";				
 				stack.pop();
 				return "error";
 			}			
@@ -310,8 +349,10 @@ public class Visitor extends SQLBaseVisitor<Object> {
 		
 		// Load existing databases.
 		JSONObject masterDatabases;
+		JSONArray databases;
 		try {
 			masterDatabases = new JSONObject(data);
+			databases = masterDatabases.getJSONArray("databases");
 		} catch (JSONException e) {
 			// TODO Auto-generated catch block
 			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in SHOW DATABASES statement. A json instruction was not completed.\n\n";
@@ -319,11 +360,12 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			return "error";
 		}
 		
+		String result = "SHOW DATABASES query returned successfully.\n\nResult of the query: " + databases.length() + " databases were found.\n\n";
 		// Calling a method that prepares viewing databases.
 		String dataView = myTools.convertToContentJsonView(masterDatabases.toString());
 		
-		// Pass to Console Result.
-		GUI.msgConfirm = dataView;
+		// Pass to Console Result.		
+		GUI.msgConfirm = result + dataView;
 		
 		return "void";
 	}
@@ -438,194 +480,218 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			
 			// ************ CONSTRAINTS OF THE TABLE ************
 			
-			Object[] constraints = (Object[])visit(ctx.constraints());
-			if (constraints == null){
-				GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. A CHECK CONSTRAINT is invalid.\n\n";
-				stack.pop();
-				return "error";
-			}
 			JSONObject jsonConstraints = new JSONObject();
 			
-			
-			// ************ Obtain primary key of the table ************
-			JSONArray jsonPKs = new JSONArray();
-			JSONObject jsonPK = new JSONObject();
-			
-			ArrayList<Object[]> pks = (ArrayList<Object[]>)constraints[0];
-			// There must be only one primary key.
-			if (pks.size() > 1){
-				GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. There must be only one primary key.\n\n";
-				stack.pop();
-				return "error";				
-			}
-			
-			jsonPK.put("pkName", pks.get(0)[0]);
-			JSONArray jsonPKColumns = new JSONArray();
-			for (String col: (ArrayList<String>) pks.get(0)[1]){
-				if (!columnsAux.contains(col)){
-					GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. Column referenced by PRIMARY KEY does not exist.\n\n";
-					stack.pop();
-					return "error";
-				}
-				if (myTools.jsonArrayContain(jsonPKColumns, col)){
-					GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. Repeated columns were found in PRIMARY KEY.\n\n";
-					stack.pop();
-					return "error";
-				}
-				jsonPKColumns.put(col);					
-			}
-			jsonPK.put("columns", jsonPKColumns);
-			jsonPKs.put(jsonPK);
-			jsonConstraints.put("pks", jsonPKs);
-			
-			
-			// ************Obtain foreign keys of the table ************
-						
-			JSONArray jsonFKs = new JSONArray();
-			JSONObject jsonFK = new JSONObject();
-			ArrayList<String> fkNames = new ArrayList<String>();
-			String fkName;
-			
-			
-			for (Object[] fk: (ArrayList<Object[]>)constraints[1]){
-				
-				if (fkNames.contains(fk[0])){
-					GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. FOREIGN KEY whith that name already exist.\n\n";
-					stack.pop();
-					return "error";
-				}
-				jsonFK.put("fkName", fk[0]);
-				
-				
-				JSONArray jsonFKLocalColumns = new JSONArray();
-				for (String col: (ArrayList<String>)fk[1]){
-					if (!columnsAux.contains(col)){
-						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. Column referenced by FOREIGN KEY does not exist.\n\n";
-						stack.pop();
-						return "error";
-					}
-					jsonFKLocalColumns.put(col);
-				}
-				jsonFK.put("columns", jsonFKLocalColumns);
-				
-				
-				String tableRefName = (String)fk[2];				
-				JSONObject jsonTableRef;
-				JSONArray jsonTableRefColumns = null;
-				boolean tableRefExist = false;
-				for (int i=0; i<tables.length(); i++){
-					jsonTableRef = (JSONObject) tables.get(i);					
-					if (jsonTableRef.getString("name").equals(tableRefName)){
-						jsonTableRefColumns = jsonTableRef.getJSONArray("columns");
-						tableRefExist = true;
-						break;
-					}
-				}
-				if (!tableRefExist){
-					GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. Table referenced by a FOREIGN KEY does not exist.\n\n";
+			// If table has constraints...
+			if (ctx.getChildCount() > 6 ){
+		
+				Object[] constraints = (Object[])visit(ctx.constraints());
+				if (constraints == null){
+					GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. A CHECK CONSTRAINT is invalid.\n\n";
 					stack.pop();
 					return "error";
 				}
 				
-				jsonFK.put("tableRef", tableRefName);
+				// ************ Obtain primary key of the table ************
+				JSONArray jsonPKs = new JSONArray();
+				JSONObject jsonPK = new JSONObject();
 				
-				// Obtain columns referenced by FOREIGN KEY.
-				JSONArray jsonFKRefColumns = new JSONArray();				
-				for (String col: (ArrayList<String>)fk[3]){
-					// Verify that this column for FOREIGN KEY exists in the referenced table.					
-					if (myTools.jsonArrayContain(jsonFKRefColumns, col)){						
-						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. Repeated columns were found in FOREIGN KEY.\n\n";
-						stack.pop();
-						return "error";
-					}					
-					jsonFKRefColumns.put(col);					
+				ArrayList<Object[]> pks = (ArrayList<Object[]>)constraints[0];
+				// There must be only one primary key.
+				if (pks.size() > 1){
+					GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. There must be only one primary key.\n\n";
+					stack.pop();
+					return "error";				
 				}
-				
-				// Check compatibility FOREIGN KEY columns.
-				if (jsonFKLocalColumns.length() == jsonFKRefColumns.length()){
-					for (int i=0; i<jsonFKRefColumns.length(); i++){
-						String fkRefColumn = jsonFKRefColumns.getString(i);
-						// Verify that the referenced columns exist in this table.
-						if (!myTools.jsonArrayContain(jsonFKLocalColumns, fkRefColumn)){
-							GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. FOREIGN KEY columns are incompatible.\n\n";
+				JSONArray jsonPKColumns = null;
+				if (pks.size() > 0){
+					jsonPK.put("pkName", pks.get(0)[0]);
+					jsonPKColumns = new JSONArray();
+					for (String col: (ArrayList<String>) pks.get(0)[1]){
+						if (!columnsAux.contains(col)){
+							GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. Column referenced by PRIMARY KEY does not exist.\n\n";
 							stack.pop();
 							return "error";
 						}
-						for (int j=0; j<jsonColumns.length(); j++){
-							JSONObject jsonColumn = jsonColumns.getJSONObject(i);
-							if (jsonColumn.get("name").equals(fkRefColumn)){
-								ArrayList<String> items = new ArrayList();
-								items.add("name");
-								items.add("type");
-								if (!myTools.jsonArrayContain(jsonTableRefColumns, jsonColumn, items)){
-									GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. Column referenced by FOREIGN KEY does not exist in referenced table.\n\n";
-									stack.pop();
-									return "error";
-								}
-								else{
-									break;
-								}
-							}
+						if (myTools.jsonArrayContain(jsonPKColumns, col)){
+							GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. Repeated columns were found in PRIMARY KEY.\n\n";
+							stack.pop();
+							return "error";
 						}
-					}
+						jsonPKColumns.put(col);					
+					}					
 				}
-				else{
-					GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. FOREIGN KEY columns are incompatible.\n\n";
-					stack.pop();
-					return "error";
-				}
+
+				jsonPK.put("columns", jsonPKColumns);
+				jsonPKs.put(jsonPK);
+				jsonConstraints.put("pks", jsonPKs);
 				
 				
-				jsonFK.put("refColumns", jsonFKRefColumns);
+				// ************Obtain foreign keys of the table ************
+							
+				JSONArray jsonFKs = new JSONArray();
+				JSONObject jsonFK = new JSONObject();
+				ArrayList<String> fkNames = new ArrayList<String>();
+				String fkName;
 				
-				// Add the new FOREING KEY.
-				jsonFKs.put(jsonFK);
-				fkNames.add((String) fk[0]);
-			}			
-			jsonConstraints.put("fks", jsonFKs);
-			
-			
-			
-			
-			// Obtain checks of the table.
-			ArrayList<String[]> checks = (ArrayList<String[]>)constraints[2];			
-			JSONArray jsonChecks = new JSONArray();
-			ArrayList<String> checkNames = new ArrayList();
-			for (String[] check: checks){
-				String checkName = check[0];
-				String checkExpression = check[1];
-				if (checkNames.contains(checkName)){
-					GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. CHECK whith that name already exist.\n\n";
-					stack.pop();
-					return "error";
-				}
 				
-				Object[] expression = myTools.getColumns(checkExpression);
-				checkExpression = (String)expression[0];
-				/*
-				ArrayList<String> ids = (ArrayList<String>)expression[1];
-				for (String id: ids){
-					if (!columnsAux.contains(id)){
-						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. Expression referenced by CHECK expression does not exist.\n\n";
+				for (Object[] fk: (ArrayList<Object[]>)constraints[1]){
+					
+					// Validate fkName
+					if (fkNames.contains(fk[0])){
+						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. FOREIGN KEY whith that name already exist.\n\n";
 						stack.pop();
 						return "error";
 					}
+					jsonFK.put("fkName", fk[0]);
+					
+					// Validate local columns referenced.
+					JSONArray jsonFKLocalColumns = new JSONArray();
+					ArrayList<String> listFKLocalColumnsType = new ArrayList<String>();
+					
+					for (String col: (ArrayList<String>)fk[1]){										
+						// Evite repeated columns in local referenced columns.
+						if (myTools.jsonArrayContain(jsonFKLocalColumns, col)){						
+							GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. Repeated columns were found in FOREIGN KEY.\n\n";
+							stack.pop();
+							return "error";
+						}
+						if (!columnsAux.contains(col)){
+							GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. Column '" + col + "' referenced by FOREIGN KEY does not exist in local table.\n\n";
+							stack.pop();
+							return "error";
+						}
+						
+						// Get local columns type.
+						for (int i=0; i<jsonColumns.length(); i++){
+							JSONObject jsonColumn = jsonColumns.getJSONObject(i);
+							listFKLocalColumnsType.add(jsonColumn.getString("type"));						
+						}
+						
+						jsonFKLocalColumns.put(col);
+					}
+					jsonFK.put("columns", jsonFKLocalColumns);
+					
+					// Get referenced table name.
+					String tableRefName = (String)fk[2];
+					
+					
+					JSONObject jsonTableRef;
+					JSONArray jsonTableRefColumns = null;
+					boolean tableRefExist = false;
+					for (int i=0; i<tables.length(); i++){
+						jsonTableRef = (JSONObject) tables.get(i);					
+						if (jsonTableRef.getString("name").equals(tableRefName)){
+							jsonTableRefColumns = jsonTableRef.getJSONArray("columns");
+							tableRefExist = true;
+							break;
+						}
+					}
+					if (!tableRefExist){
+						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. Table referenced by a FOREIGN KEY does not exist.\n\n";
+						stack.pop();
+						return "error";
+					}
+					
+					jsonFK.put("tableRef", tableRefName);
+					
+					// Obtain columns referenced by FOREIGN KEY.				
+					JSONArray jsonFKRefColumns = new JSONArray();				
+					for (String col: (ArrayList<String>)fk[3]){
+						// Evite repeated columns in external referenced columns.
+						if (myTools.jsonArrayContain(jsonFKRefColumns, col)){						
+							GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. Repeated columns were found in FOREIGN KEY.\n\n";
+							stack.pop();
+							return "error";
+						}
+						jsonFKRefColumns.put(col);					
+					}
+					
+					// Check compatibility FOREIGN KEY columns.
+					if (jsonFKLocalColumns.length() == jsonFKRefColumns.length()){
+						int indexLocalColumns = 0;
+						for (int i=0; i<jsonFKRefColumns.length(); i++){
+							String fkRefColumn = jsonFKRefColumns.getString(i);
+							boolean existInReferencedTableName = false;
+							boolean existInReferencedTableType = false;
+							// Verify that the referenced external columns exist and has the same type.
+							for (int j=0; j<jsonTableRefColumns.length(); j++){
+								JSONObject jsonTableRefColumn = jsonTableRefColumns.getJSONObject(i);
+								if (jsonTableRefColumn.get("name").equals(fkRefColumn)){
+									existInReferencedTableName = true;
+									if (jsonTableRefColumn.get("type").equals(listFKLocalColumnsType.get(indexLocalColumns))){
+										existInReferencedTableType = true;
+										break;
+									}
+									break;
+								}
+							}
+							
+							if (!existInReferencedTableName){
+								GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. Column '" + fkRefColumn + "' referenced by FOREIGN KEY does not exist in referenced table.\n\n";
+								stack.pop();
+								return "error";
+							}
+							if (!existInReferencedTableType){
+								GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. Column '" + fkRefColumn + "' referenced by FOREIGN KEY does not have the same type.\n\n";
+								stack.pop();
+								return "error";
+							}
+													
+							indexLocalColumns ++;
+						}
+					}
+					else{
+						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. FOREIGN KEY columns are incompatible.\n\n";
+						stack.pop();
+						return "error";
+					}
+					
+					
+					jsonFK.put("refColumns", jsonFKRefColumns);
+					
+					// Add the new FOREING KEY.
+					jsonFKs.put(jsonFK);
+					fkNames.add((String) fk[0]);
 				}
-				*/
-				JSONObject jsonCheck = new JSONObject();
-				jsonCheck.put("name", checkName);
-				jsonCheck.put("check", checkExpression);
-				jsonChecks.put(jsonCheck);
-				checkNames.add(checkName);
+				jsonConstraints.put("fks", jsonFKs);
+				
+				
+				// Obtain checks of the table.
+				ArrayList<String[]> checks = (ArrayList<String[]>)constraints[2];
+				JSONArray jsonChecks = new JSONArray();
+				ArrayList<String> checkNames = new ArrayList();
+				for (String[] check: checks){
+					String checkName = check[0];
+					String checkExpression = check[1];
+					if (checkNames.contains(checkName)){
+						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CREATE TABLE statement. CHECK whith that name already exist.\n\n";
+						stack.pop();
+						return "error";
+					}
+					JSONObject jsonCheck = new JSONObject();
+					jsonCheck.put("name", checkName);
+					jsonCheck.put("check", checkExpression);
+					jsonChecks.put(jsonCheck);
+					checkNames.add(checkName);
+				}
+				
+				jsonConstraints.put("checks", jsonChecks);
+				
 			}
-			
-			
+			else{
+				JSONArray jsonPKs = new JSONArray();
+				jsonConstraints.put("pks", jsonPKs);
+				JSONArray jsonFKs = new JSONArray();
+				jsonConstraints.put("fks", jsonFKs);
+				JSONArray jsonChecks = new JSONArray();
+				jsonConstraints.put("checks", jsonChecks);
+			}
 			
 			// ************ Creating the json Table ************
 			jsonTableSchema.put("name", tableName);
 			jsonTableSchema.put("columns", jsonColumns);
-			jsonTableSchema.put("constraints", jsonConstraints);
-			jsonTableSchema.put("checks", jsonChecks);
+			jsonTableSchema.put("constraints", jsonConstraints);			
 			jsonTableSchema.put("numRegisters", 0);
 			
 			tables.put(jsonTableSchema);
@@ -653,8 +719,9 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			// Rewriting masterDatabases...
 			myTools.writeFile(masterDatabasesFile, masterDatabases.toString());
 		
-			GUI.msgConfirm += "CREATE TALBE query returned successfully.\n\n";			
-			GUI.msgConfirm += myTools.convertToContentJsonView(jsonTableSchema.toString()) + "\n\n";
+			GUI.msgConfirm += "CREATE TALBE query returned successfully.\n\n";
+			GUI.addDatabaseTableToJTree(GUI.currentDatabase, tableName);
+			GUI.msgConfirm += myTools.convertToContentJsonView(jsonTableSchema.toString()) + "\n\n";			
 			stack.pop();
 			return "void";
 			
@@ -716,6 +783,12 @@ public class Visitor extends SQLBaseVisitor<Object> {
 		// TODO Auto-generated method stub
 		int num = Integer.parseInt(ctx.NUM().getText());
 		return "char" + ":" + num;
+	}
+	
+	@Override
+	public Object visitTypeBoolean(TypeBooleanContext ctx) {
+		// TODO Auto-generated method stub
+		return "boolean";
 	}
 	
 	@Override
@@ -790,6 +863,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			stack.pop();
 			return null;
 		}
+		
 		if (!expression.getType().equals("boolean")){
 			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in CHECK CONSTRAINT statement. CHECK expression type must be boolean.\n\n";
 			stack.pop();
@@ -1010,67 +1084,17 @@ public class Visitor extends SQLBaseVisitor<Object> {
 	
 	@Override
 	public Object visitVarExpressionID(VarExpressionIDContext ctx) {
-		stack.push("varExpression");
-		String columnID = "";
-		String tableID = "";
-		Expression expression = null;
-		if (!selecting){
-			if (ctx.ID().size() == 1){
-				tableID = currentTables.get(0);
-				columnID = ctx.ID(0).getText();
-			}
-			else{
-				tableID = ctx.ID(0).getText();
-				columnID = ctx.ID(1).getText();
-			}
-			
-			// Validate the expression.
-			if (!currentTables.contains(tableID)){
-				GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in expression statement. The reference " + tableID + "." + columnID + " is invalid.\n\n";
-				stack.pop();
-				return null;
-			}
-			expression = this.existInCurrentColumns(columnID);			
-			if (expression == null){
-				GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in expression statement. The column '" + columnID + "' does not exist in the referenced table.\n\n";
-				stack.pop();
-				return null;
-			}		
+		stack.push("varExpressionID");
+		String columnID = ctx.ID().getText();
+		Expression expression = this.existInCurrentColumns(columnID);			
+		if (expression == null){
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in expression statement. The column '" + columnID + "' does not exist in the referenced table.\n\n";
+			stack.pop();
+			return null;
 		}
-		else{
-			if (ctx.ID().size() == 1){
-				columnID = ctx.ID(0).getText();
-				if (this.countIDs(currentColumns, columnID) > 1){
-					GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in expression statement. The reference '" + columnID + "' is ambiguous.\n\n";
-					stack.pop();
-					return null;
-				}
-				expression = this.existInCurrentColumns(columnID);
-				if (expression == null){
-					GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in expression statement. The column '" + columnID + "' does not exist.\n\n";
-					stack.pop();
-					return null;
-				}
-			}
-			else{
-				tableID = ctx.ID(0).getText();
-				columnID = ctx.ID(1).getText();
-				if (!currentTables.contains(tableID)){
-					GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in expression statement. The reference '" + tableID + "." + columnID + "' is invalid.\n\n";
-					stack.pop();
-					return null;
-				}
-				expression = this.existInCurrentColumns(tableID + "." + columnID);
-				if (expression == null){
-					GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in expression statement. The column '" + columnID + "' does not exist in the referenced table.\n\n";
-					stack.pop();
-					return null;
-				}
-			}
-		}		
-		
+
 		// Instance the expression for this Expression and return it.
-		String expr = (ctx.ID().size() == 2)?  "id[" + tableID + "." + columnID + "]" : "id[" + columnID + "]";
+		String expr = "id[" + columnID + "]";
 		expression = new Expression(expr, expression.getType());
 		stack.pop();
 		return expression;
@@ -1128,7 +1152,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 	@Override
 	public Object visitBooleanValue(BooleanValueContext ctx) {
 		String chars = ctx.getChild(0).getText();
-		Expression value = new Expression(chars, "char");
+		Expression value = new Expression(chars, "boolean");
 		return value;
 	}	
 	
@@ -1175,26 +1199,46 @@ public class Visitor extends SQLBaseVisitor<Object> {
 		// If ther is no error, load masterDatabase to find it.		
 		File masterDatabaseFile = new File("databases\\"+ GUI.currentDatabase + "\\masterDatabase.json");
 		String data = myTools.readFile(masterDatabaseFile);
-		JSONObject masterDatabase;
-		JSONArray tables;
+		JSONObject jsonMasterDatabase;
+		JSONArray jsonTables;
 
 		try {
-			masterDatabase = new JSONObject(data);
-			tables = masterDatabase.getJSONArray("tables");
+			
+			jsonMasterDatabase = new JSONObject(data);
+			jsonTables = jsonMasterDatabase.getJSONArray("tables");
+			
+			// If table exist, verify if it is referenced by any table.
+			for (int i=0; i<jsonTables.length(); i++){
+				JSONObject jsonTable = jsonTables.getJSONObject(i);
+				JSONObject jsonConstraints = jsonTable.getJSONObject("constraints");
+				JSONArray jsonFKs = jsonConstraints.getJSONArray("fks");
+				for (int j=0; j<jsonFKs.length(); j++){
+					JSONObject jsonFK = jsonFKs.getJSONObject(j);
+					String tableRef = jsonFK.getString("tableRef");
+					if (tableRef.equals(tableName)){
+						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in RENAME TABLE statement. The table '" + tableName + "' is referenced for a FOREIGN KEY in table '" + jsonTable.getString("name") + "'.\n\n";
+						stack.pop();
+						return "error";	
+					}
+				}
+			}
+			
 			// Searching table...
-			for (int i=0; i<tables.length(); i++){
-				JSONObject table = (JSONObject) tables.get(i);
+			for (int i=0; i<jsonTables.length(); i++){
+				JSONObject table = (JSONObject) jsonTables.get(i);
 				if (table.getString("name").equals(tableName)){
 					table.put("name", newTableName);
 					break;
 				}
 			}
+						
 			// Rewriting masterDatabases...		
-			myTools.writeFile(masterDatabaseFile, masterDatabase.toString());
+			myTools.writeFile(masterDatabaseFile, jsonMasterDatabase.toString());
 			File newTableFile = new File("databases\\"+ GUI.currentDatabase + "\\" + newTableName + ".json");
 			// Rename table file.
 			tableFile.renameTo(newTableFile);
 			GUI.msgConfirm += "RENAME TABLE query returned successfully.\n\n";
+			GUI.renameDatabaseTableOnJTree(GUI.currentDatabase, tableName, newTableName);
 			stack.pop();
 			return "void";
 			
@@ -1225,35 +1269,53 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			return "error";	
 		}
 		
-		// If table exist, load masterDatabase to remove it.
-		File masterDatabaseFile = new File("databases\\"+ GUI.currentDatabase + "\\masterDatabase.json");
+		
+		// If table exist, verify if it is referenced by any table.				
+		
+		File masterDatabaseFile = new File("databases\\" + GUI.currentDatabase + "\\masterDatabase.json");
 		String data = myTools.readFile(masterDatabaseFile);
-		JSONObject masterDatabase;
-		JSONArray tables;
+		JSONObject jsonMasterDatabase;
+		JSONArray jsonTables;
 		try {
-			masterDatabase = new JSONObject(data);
-			tables = masterDatabase.getJSONArray("tables");
+			jsonMasterDatabase = new JSONObject(data);
+			jsonTables = jsonMasterDatabase.getJSONArray("tables");
+			int numRecords = 0;
+			for (int i=0; i<jsonTables.length(); i++){
+				JSONObject jsonTable = jsonTables.getJSONObject(i);
+				JSONObject jsonConstraints = jsonTable.getJSONObject("constraints");
+				JSONArray jsonFKs = jsonConstraints.getJSONArray("fks");
+				for (int j=0; j<jsonFKs.length(); j++){
+					JSONObject jsonFK = jsonFKs.getJSONObject(j);
+					String tableRef = jsonFK.getString("tableRef");
+					if (tableRef.equals(tableName)){
+						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in DROP TABLE statement. The table '" + tableName + "' is referenced for a FOREIGN KEY in table '" + jsonTable.getString("name") + "'.\n\n";
+						stack.pop();
+						return "error";	
+					}
+				}
+			}
+
 			// Searching table...
-			for (int i=0; i<tables.length(); i++){
-				JSONObject table = (JSONObject) tables.get(i);
-				if (table.getString("name").equals(tableName)){
+			for (int i=0; i<jsonTables.length(); i++){
+				JSONObject jsonTable = (JSONObject) jsonTables.get(i);
+				if (jsonTable.getString("name").equals(tableName)){
 					// Confirm the delete action.
-					String msgConfirm = "¿Borrar tabla " + tableName + " con " + table.getInt("numRegisters") + " registros?";
+					String msgConfirm = "¿Borrar tabla " + tableName + " con " + jsonTable.getInt("numRegisters") + " registros?";
 					int option = JOptionPane.showConfirmDialog(null, msgConfirm);
 			        if(option == JOptionPane.YES_OPTION){
 			        	// Delete database in masterDatabases and directory also.
-			        	tables.remove(i);
+			        	jsonTables.remove(i);
 			        	tableFile.delete();
 			        	break;
-			        }			        
-			        GUI.msgConfirm += "DROP TABLE query canceled.\n\n";
+			        }
+			        GUI.msgConfirm += "DROP TABLE query canceled.\n\n";			        
 		        	stack.pop();
 			        return "void";
 				}
 			}
 			
 			// Rewriting masterDatabases...
-			myTools.writeFile(masterDatabaseFile, masterDatabase.toString());
+			myTools.writeFile(masterDatabaseFile, jsonMasterDatabase.toString());
 			
 			
 			// Substract one to atribute numTables in masterDatabases for current database.
@@ -1272,9 +1334,9 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			
 			// Rewriting masterDatabases...
 			myTools.writeFile(masterDatabasesFile, masterDatabases.toString());
-			
-			
+						
 			GUI.msgConfirm += "DROP TABLE query returned successfully.\n\n";
+			GUI.dropDatabaseTableOnJTree(GUI.currentDatabase, tableName);
 			stack.pop();
 			return "void";
 			
@@ -1376,78 +1438,1070 @@ public class Visitor extends SQLBaseVisitor<Object> {
 			return "error";
 		}
 	}
-
-	
-	
-	
-	
-	
 	
 	@Override
-	public Object visitSelectSome(SelectSomeContext ctx) {
+	public Object visitAlterTableAction(AlterTableActionContext ctx) {
+		stack.push("actionAlterTableAction");
+		// Verify that a database is using.
+		if (GUI.currentDatabase.equals("")){
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in ALTER TABLE statement. No database loaded.\n\n";
+			stack.pop();
+			return "error";				
+		}
+		// Add current table to use.
+		currentTables = new ArrayList<String>();
+		String tableName = ctx.ID().getText();
+		currentTables.add(tableName);
+				
+		String result = (String)visit(ctx.actions());
+		if (result.equals("error")){
+			stack.pop();
+			return "error";
+		}				
+		return "void";
+	}
+	
+	@Override
+	public Object visitActions(ActionsContext ctx) {
+		stack.push("actions");
 		// TODO Auto-generated method stub
-		return null;
+		for (ActionContext action: ctx.action()){
+			String result = (String)visit(action);
+			if (result.equals("error")){
+				stack.pop();
+				return "error";
+			}
+		}
+		stack.pop();
+		return "void";		
 	}
 
 	@Override
-	public Object visitActionDropConstrait(ActionDropConstraitContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
+	public Object visitActionDropColumn(ActionDropColumnContext ctx) {		
+		stack.push("actionDropColumn");
+		// Verify that a database is using.
+		if (GUI.currentDatabase.equals("")){
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in ALTER TABLE DROP COLUMN statement. No database loaded.\n\n";
+			stack.pop();
+			return "error";
+		}
+		
+		String tableName = currentTables.get(0);
+		String column = ctx.ID().getText();
+		
+		// Verify that table exist.
+		File tableFile = new File("databases\\"+ GUI.currentDatabase + "\\" + tableName + ".json");
+		if (!tableFile.exists()){
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in ALTER TABLE DROP COLUMN statement. Table '"+ tableName + "' does not exist.\n\n";
+			stack.pop();
+			return "error";	
+		}
+		
+		// If table exist, load master database.
+		File masterDatabaseFile = new File("databases\\" + GUI.currentDatabase + "\\masterDatabase.json");
+		String data = myTools.readFile(masterDatabaseFile);
+		JSONObject jsonMasterDatabase;
+		JSONArray jsonTables;
+		try {
+			jsonMasterDatabase = new JSONObject(data);
+			jsonTables = jsonMasterDatabase.getJSONArray("tables");
+			
+			// Verify that column exist in the table.
+			boolean existColumnInTable = false;
+			JSONArray jsonColumns = null;
+			for (int i=0; i<jsonTables.length(); i++){
+				JSONObject jsonTable = jsonTables.getJSONObject(i);				
+				if (jsonTable.getString("name").equals(tableName)){
+					jsonColumns = jsonTable.getJSONArray("columns");					
+					for (int j=0; j<jsonColumns.length(); j++){					
+						JSONObject col = jsonColumns.getJSONObject(j);
+						if (col.getString("name").equals(column)){
+							existColumnInTable = true;
+							break;
+						}
+					}
+				}
+				if (existColumnInTable)
+					break;
+			}			
+			if (!existColumnInTable){
+				GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in ALTER TABLE DROP COLUMN statement. Column '"+ column + "' does not exist in table '" + tableName + "'.\n\n";
+				stack.pop();
+				return "error";	
+			}
+			
+			
+			// Verify if it is referenced by any table.
+			for (int i=0; i<jsonTables.length(); i++){
+				JSONObject jsonTable = jsonTables.getJSONObject(i);				
+				JSONObject jsonConstraints = jsonTable.getJSONObject("constraints");
+				JSONArray jsonFKs = jsonConstraints.getJSONArray("fks");
+				for (int j=0; j<jsonFKs.length(); j++){					
+					JSONObject jsonFK = jsonFKs.getJSONObject(j);
+					JSONArray columnsRef = jsonFK.getJSONArray("refColumns");
+					for (int k=0; k<columnsRef.length(); k++){
+						String columnRef = columnsRef.getString(k);
+						if (column.equals(columnRef)){
+							GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in ALTER TABLE DROP COLUMN statement. The column '" + column + "' is referenced for a FOREIGN KEY in table '" + jsonTable.getString("name") + "'.\n\n";
+							stack.pop();
+							return "error";
+						}
+					}
+				}
+			}
 
+			// If there is no error, drop the column of the table.
+			
+			for (int j=0; j<jsonColumns.length(); j++){
+				JSONObject jsonColumn = jsonColumns.getJSONObject(j);
+				if (jsonColumn.getString("name").equals(column)){
+					jsonColumns.remove(j);
+					break;
+				}
+			}
+			
+			// Rewriting masterDatabases...
+			myTools.writeFile(masterDatabaseFile, jsonMasterDatabase.toString());			
+			GUI.msgConfirm += "ALTER TABLE DROP COLUMN query returned successfully.\n\n";
+			stack.pop();
+			return "void";
+			
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in ALTER TABLE DROP COLUMN statement. A json instruction was not completed.\n\n";
+			stack.pop();
+			return "error";
+		}
+			
+	}
+	
 	@Override
-	public Object visitSelect(SelectContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
+	public Object visitActionAddColumn(ActionAddColumnContext ctx) {
+		stack.push("actionAddColumn");
+		
+		return "error";
 	}
-
+	
 	@Override
 	public Object visitActionAddConstraint(ActionAddConstraintContext ctx) {
 		// TODO Auto-generated method stub
-		return null;
+		return "error";
 	}
-
+	
 	@Override
-	public Object visitUpdate(UpdateContext ctx) {
+	public Object visitActionDropConstrait(ActionDropConstraitContext ctx) {
 		// TODO Auto-generated method stub
-		return null;
+		return "error";
 	}
-
-	@Override
-	public Object visitDelette(DeletteContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Object visitActionAddColumn(ActionAddColumnContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Object visitActionDropColumn(ActionDropColumnContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Object visitAlterTableAccion(AlterTableAccionContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Object visitSelectAll(SelectAllContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
+	
+	
+	
 	@Override
 	public Object visitInsert(InsertContext ctx) {
-		// TODO Auto-generated method stub
-		return null;
+		stack.push("insert");
+		GUI.msgVerbose += "visitInsert: Starting to insert a new tuple.\n";
+		// Verify that a database is using.
+		if (GUI.currentDatabase.equals("")){
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in ALTER TABLE DROP COLUMN statement. No database loaded.\n\n";
+			stack.pop();
+			return "error";
+		}
+		
+		// That is a new insert.
+		counter++;
+		
+		String tableName = ctx.ID().getText();
+		File tableFile = new File("databases\\"+ GUI.currentDatabase + "\\" + tableName + ".json");
+		
+		if (currentTables.size() != 0){
+			if (!currentTables.get(0).equals(tableName)){				
+				GUI.msgVerbose += "Proceeding to insert values for the table '" + currentTables.get(0) + "'.\n";
+				
+				// Insert accumulated values...								
+				File prevTableFile = new File("databases\\"+ GUI.currentDatabase + "\\" + currentTables.get(0) + ".json");
+				
+				try {
+					for (int i=0; i<jsonDataToInsert.length(); i++)				
+						jsonCurrentData.put(jsonDataToInsert.getJSONArray(i));
+				} catch (JSONException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+					GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in INSERT statement. A json instruction was not completed.\n\n";
+					stack.pop();
+					return "error";
+				}
+				
+				GUI.msgVerbose += "Writing json file for the table '" + currentTables.get(0) + "'\n";
+				// Rewriting masterDatabases...
+				myTools.writeFile(prevTableFile, jsonTable.toString());
+				GUI.msgConfirm += "INSERT query returned successfully. " + String.valueOf(counter-1) + " rows affected.\n\n";
+				currentTables.clear();
+				counter = 1;
+			}
+		}
+		
+		if (counter == 1){
+			GUI.msgVerbose += "Checking if exists the referenced table.\n";
+			// Verify that table exist.			
+			if (!tableFile.exists()){
+				GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in INSERT statement. Table '"+ tableName + "' does not exist.\n\n";
+				stack.pop();
+				return "error";	
+			}
+			
+			GUI.msgVerbose += "Loading data table.\n";
+			// Reloading new data...
+			String tableContent = myTools.readFile(tableFile);
+			try {
+				jsonTable = new JSONObject(tableContent);
+				jsonCurrentData = jsonTable.getJSONArray("data");				
+			} catch (JSONException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+				GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in INSERT statement. A json instruction was not completed.\n\n";
+				stack.pop();
+				return "error";
+			}
+			
+			currentTables.add(tableName);
+			jsonDataToInsert = new JSONArray();
+		}
+		
+		GUI.msgVerbose += "Constructing a new tuple.\n";
+
+		JSONArray jsonTupla = new JSONArray();
+	
+	
+		GUI.msgVerbose += "Getting values to insert.\n";
+		ArrayList<String> values = (ArrayList<String>)visit(ctx.insertValues());				
+		if (values == null){
+			stack.pop();
+			return "error";
+		}
+		
+		GUI.msgVerbose += "Values to insert created successfully.\n";
+		for (String value: values){
+			jsonTupla.put(value);
+			/*
+			// A int value is inserted as a Integer.
+			if (value.getType().equals("int")){
+				jsonTupla.put(Integer.parseInt(value.getExpression()));
+			}
+			// A char value is inserted as a String.
+			else if (value.getType().equals("char")){												
+				jsonTupla.put(value.getExpression());
+			}
+			// A float value is inserted as a Double.
+			else if (value.getType().equals("float")){												
+				jsonTupla.put(Double.parseDouble(value.getExpression()));
+			}
+			// A boolean value is inserted as a Boolean.
+			else if (value.getType().equals("boolean")){
+				jsonTupla.put(Boolean.parseBoolean(value.getExpression()));
+			}
+			// A date value is inserted as a String.
+			else if (value.getType().equals("date")){
+				jsonTupla.put(value.getExpression());
+			}
+			// A null value is inserted as a null String,
+			else{
+				jsonTupla.put("");
+			}
+			*/
+		}
+		GUI.msgVerbose += "Put the new tuple in Data to Insert.\n";
+		jsonDataToInsert.put(jsonTupla);
+			
+			
+		if (!nextInstruction.equalsIgnoreCase("INSERT")){
+			GUI.msgVerbose += "Proceeding to insert values for the table '" + tableName + "'.\n";
+			try {
+				for (int i=0; i<jsonDataToInsert.length(); i++)				
+					jsonCurrentData.put(jsonDataToInsert.getJSONArray(i));
+			} catch (JSONException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+				GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in INSERT statement. A json instruction was not completed.\n\n";
+				stack.pop();
+				return "error";
+			}
+			
+			// Rewriting table...
+			GUI.msgVerbose += "Writing json file for the table '" + tableName + "'\n";			
+			myTools.writeFile(tableFile, jsonTable.toString());
+			currentTables.clear();			
+			
+			GUI.msgConfirm += "INSERT query returned successfully. " + counter + " rows affected.\n\n";
+			counter = 0;
+			stack.pop();
+			return "void";
+		}
+		else{
+			stack.pop();
+			return "void";
+		}			
+		
+				
 	}
+
+	@Override
+	public Object visitInsertValues(InsertValuesContext ctx) {
+		stack.push("insertValues");
+		GUI.msgVerbose += "visitInsertValues:\n";
+		// Verify that a database is using.
+		if (GUI.currentDatabase.equals("")){
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in ALTER TABLE DROP COLUMN statement. No database loaded.\n\n";
+			stack.pop();
+			return null;
+		}
+		
+		String tableName = currentTables.get(0);
+		
+		GUI.msgVerbose += "Loading master database to verify columns type.\n";
+		File masterDatabaseFile = new File("databases\\" + GUI.currentDatabase + "\\masterDatabase.json");
+		String data = myTools.readFile(masterDatabaseFile);
+		JSONObject jsonMasterDatabase;
+		JSONArray jsonTables;
+		try {
+			jsonMasterDatabase = new JSONObject(data);
+			jsonTables = jsonMasterDatabase.getJSONArray("tables");
+			
+			JSONArray jsonColumns = null, jsonPK = null, jsonFKs = null, jsonChecks = null;			
+			GUI.msgVerbose += "Searching table in master database.\n";
+			for (int i=0; i<jsonTables.length(); i++){
+				JSONObject jsonTable = jsonTables.getJSONObject(i);
+				if (jsonTable.getString("name").equals(tableName)){
+					jsonColumns = jsonTable.getJSONArray("columns");
+					jsonPK = jsonTable.getJSONObject("constraints").getJSONArray("pks");
+					jsonFKs = jsonTable.getJSONObject("constraints").getJSONArray("fks");
+					jsonChecks = jsonTable.getJSONObject("constraints").getJSONArray("checks");
+					GUI.msgVerbose += "\tTable found.\n";
+					break;
+				}
+			}
+			
+			InsertContext ctxInsert = (InsertContext) ctx.getParent().getRuleContext();
+			ArrayList<String> insertColumns = null;
+			ArrayList<Expression> insertColumnsExpression = null;  // This list contains the column type and its index in the jsonColumns.			
+			
+			if (ctxInsert.insertColumns() != null){
+				GUI.msgVerbose += "INSERT querie with target columns.\n";
+				
+				insertColumns = (ArrayList<String>)visit(ctxInsert.insertColumns());								
+				if (insertColumns.size() != ctx.value().size()){
+					if (insertColumns.size() > ctx.value().size())
+						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in INSERT statement. INSERT has more target columns than expressions.\n\n";
+					else
+						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in INSERT statement. INSERT has more expressions than target columns.\n\n";
+					stack.pop();
+					return null;
+				}
+
+				insertColumnsExpression = new ArrayList<Expression>();
+				// Verifing that target columns exist in the referenced table...
+				GUI.msgVerbose += "Verifing that target columns exist in the referenced table.\n";
+				boolean existColumn;
+				for (String col: insertColumns){
+					existColumn = false;
+					for (int i=0; i<jsonColumns.length(); i++){
+						JSONObject jsonColumn = (JSONObject) jsonColumns.get(i);
+						if (col.equals(jsonColumn.getString("name"))){
+							// Instance a new Expression that contain the column type and its index.
+							insertColumnsExpression.add(new Expression(String.valueOf(i), jsonColumn.getString("type")));
+							existColumn = true;
+							break;
+						}
+					}
+					if (!existColumn){
+						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in INSERT statement. The target column '" + col + "' does not exist in the table '" + tableName + "'.\n\n";
+						stack.pop();
+						return null;
+					}
+				}
+				GUI.msgVerbose += "All target columns exist in the referenced table.\n";
+			}
+			
+			if (ctx.value().size() > jsonColumns.length()){
+				GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in INSERT statement. Table '" + tableName + "' has exactly " + jsonColumns.length() + " columns.\n\n";
+				stack.pop();
+				return null;
+			}
+			
+						
+			ArrayList<String> values = new ArrayList<String>();
+			int indexColumn = 0;
+			String nameCol, typeCol;
+			// Instance tuple with null values...
+			for (int i=0; i<jsonColumns.length(); i++)
+				values.add("");
+			
+			
+			for (ValueContext value: ctx.value()){
+				Expression exp = (Expression)visit(value);				
+				// If value is a char or a date, remove apostrophes from it.
+				if (exp.getType().equals("date") || exp.getType().contains("char"))
+					exp.setExpression(exp.getExpression().substring(1, exp.getExpression().length()-1));
+					
+				
+				if (insertColumns != null)
+					typeCol = insertColumnsExpression.get(indexColumn).getType();
+				else
+					typeCol = jsonColumns.getJSONObject(indexColumn).getString("type");
+				
+				if (!typeCol.contains(exp.getType())){
+					// ***************** TRYING TO CAST A VALUE **************************
+					boolean typeCompatibles = false;
+					try{
+						// Cast's to Integer
+						if (typeCol.equals("int")){
+							if (exp.getType().equals("float")){
+								String newExp = exp.getExpression().substring(0, exp.getExpression().indexOf("."));		// Remove decimals.
+								exp.setExpression(newExp);
+							}
+							else if (exp.getType().equals("char")){
+								Integer.parseInt(exp.getExpression());
+							}
+							else {
+								GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in INSERT statement. Incorrect type at the input insert.\n\n";
+								stack.pop();
+								return null;
+							}
+							typeCompatibles = true;
+							exp.setType("int");
+						}
+						
+						// Cast's to float
+						else if (typeCol.equals("float")){
+							if (exp.getType().equals("int")){
+								String newExp = exp.getExpression() + ".0";		// Convert to a real number.								
+								exp.setExpression(newExp);
+							}
+							else if (exp.getType().equals("char")){
+								// Note that chars does not have the character '.', so we can cast only chars integer.
+								Integer.parseInt(exp.getExpression());
+								exp.setExpression(exp.getExpression() + ".0");								
+							}
+							else {
+								GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in INSERT statement. Incorrect type at the input insert.\n\n";
+								stack.pop();
+								return null;
+							}
+							typeCompatibles = true;
+							exp.setType("float");
+						}
+						// Cast's to char
+						else if (typeCol.contains("char")){	// You can convert any value to char.
+							exp.setType("char");
+							typeCompatibles = true;
+						}
+						// Cast's to date it's impossible.						
+
+						// Cast's to boolean
+						else if (typeCol.equals("boolean")){
+							if (exp.getType().equals("char")){
+								String newExp = exp.getExpression();
+								if (newExp.equalsIgnoreCase("true") || newExp.equalsIgnoreCase("false")){
+									exp.setType("boolean");
+									typeCompatibles = true;
+								}
+							}
+						}
+					}
+					catch (Exception e){
+						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in INSERT statement. Incorrect type at the input insert.\n\n";
+						stack.pop();
+						return null;						
+					}
+					
+					// If cast was impossible...
+					if (!typeCompatibles){
+						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in INSERT statement. Incorrect type at the input insert.\n\n";
+						stack.pop();
+						return null;						
+					}
+				}
+				
+				// Validate the length of a CHAR.
+				if (typeCol.contains("char")){
+					int length = Integer.valueOf(typeCol.split(":")[1]);
+					if (exp.getExpression().length() > length){
+						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in INSERT statement. Column '" + jsonColumns.getJSONObject(indexColumn).getString("name") + "' has lenght " + length + ".\n\n";
+						stack.pop();
+						return null;
+					}
+				}
+				
+				// Validate the format of a DATE.
+				if(typeCol.equals("date")){
+				    SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
+				    format.setLenient(false);
+					try {
+						format.parse(exp.getExpression());
+					} catch (ParseException e) {
+						// TODO Auto-generated catch block			
+						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in INSERT statement. Date format incorrect.\n\n";
+						stack.pop();
+						return null;
+					}
+				}				
+				
+				// The way to insert the value in the tuple, depends if INSERT has target columns.
+				if (insertColumns != null){
+					int index = Integer.parseInt(insertColumnsExpression.get(indexColumn).getExpression());	// Get the index..
+					values.set(index, exp.getExpression());
+				}
+				else
+					values.set(indexColumn, exp.getExpression());
+				
+				indexColumn++;
+				
+			}			
+			
+			// If the values do not complete the table, filled it with nulls.			
+			for (int i=0; i<values.size(); i++){
+				if (values.get(i).equals("")){
+					// A field that is primary key, can not be null.
+					if (jsonPK.length() == 1){
+						JSONArray jsonPKColumns = jsonPK.getJSONObject(0).getJSONArray("columns");
+						String column = jsonColumns.getJSONObject(i).getString("name");
+						if (myTools.jsonArrayContain(jsonPKColumns, column)){
+							GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in INSERT statement. The field '" + column + "' is a primary key, so can not be null.\n\n";
+							stack.pop();
+							return null;
+						}
+					}
+				}
+			}
+			
+			// Verify repeated primary keys...
+			if (jsonPK.length() == 1){
+				JSONArray jsonPKColumns = jsonPK.getJSONObject(0).getJSONArray("columns");
+				ArrayList<Integer> indexOfPKColumns = new ArrayList<Integer>();
+				JSONObject jsonColumn;
+				for (int i=0; i<jsonColumns.length(); i++){
+					jsonColumn = jsonColumns.getJSONObject(i);
+					if (myTools.jsonArrayContain(jsonPKColumns, jsonColumn.getString("name"))){
+						indexOfPKColumns.add(i);
+					}
+				}
+				boolean existTuple;
+				for (int i=0; i< jsonCurrentData.length(); i++){
+					JSONArray jsonTuple = jsonCurrentData.getJSONArray(i);
+					existTuple = true;
+					for (int j=0; j<indexOfPKColumns.size(); j++){
+						if (!jsonTuple.getString(j).equals(values.get(j))){
+							existTuple = false;
+							break;
+						}
+					}
+					if (existTuple){
+						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in INSERT statement. Duplicated key violates unicity contition.\n\n";
+						stack.pop();
+						return null;	
+					}
+				}
+				
+				for (int i=0; i< jsonDataToInsert.length(); i++){
+					JSONArray jsonTuple = jsonDataToInsert.getJSONArray(i);
+					existTuple = true;
+					for (int j=0; j<indexOfPKColumns.size(); j++){
+						if (!jsonTuple.getString(j).equals(values.get(j))){
+							existTuple = false;
+							break;
+						}
+					}
+					if (existTuple){
+						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in INSERT statement. Duplicated key violates unicity contition.\n\n";
+						stack.pop();
+						return null;	
+					}
+				}
+			}		
+			
+			
+			// Verify checks of the table...
+			if (jsonChecks.length() > 0){
+				ScriptEngineManager manager = new ScriptEngineManager();
+			    ScriptEngine engine = manager.getEngineByName("js");			    			
+				
+			    Object checkResult = null;
+				String check, checkCleaned;
+				JSONObject jsonColumn;
+				ArrayList<String> checkIDs = new ArrayList();
+				
+				for (int i=0; i<jsonChecks.length(); i++){
+					check = jsonChecks.getJSONObject(i).getString("check");
+					System.out.println("check original: " + check);
+					Object[] checkElements = myTools.getColumns(check);
+					checkCleaned = (String)checkElements[0];
+					checkIDs = (ArrayList<String>)checkElements[1];
+					
+					for (int j=0; j<jsonColumns.length(); j++){
+						jsonColumn = jsonColumns.getJSONObject(j);
+						if (checkIDs.contains(jsonColumn.getString("name"))){
+							if (jsonColumn.getString("type").equals("date") || jsonColumn.getString("type").contains("char"))
+								checkCleaned = checkCleaned.replace(jsonColumn.getString("name"), "'" + values.get(j) + "'");
+							else
+								checkCleaned = checkCleaned.replace(jsonColumn.getString("name"), values.get(j));
+						}
+					}					
+					System.out.println("check resultante: " + checkCleaned);
+					
+					try {
+						checkResult = engine.eval(checkCleaned);
+						if (checkResult.toString().equals("false")){
+							GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in INSERT statement. INSERT fails with a CHECK CONSTRAINT.\n\n";
+							stack.pop();
+							return null;							
+						}
+					} catch (ScriptException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in INSERT statement. Error when trying to evaluate a check.\n\n";
+						stack.pop();
+						return null;
+					}
+					
+				}
+			}
+
+			stack.pop();			
+			return values;
+			
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in ALTER TABLE DROP COLUMN statement. A json instruction was not completed.\n\n";
+			stack.pop();
+			return null;
+		}
+		
+	}
+	
+	@Override
+	public Object visitInsertColumns(InsertColumnsContext ctx) {
+		stack.push("insertColumns");		
+		ArrayList<String> ids = new ArrayList<String>();
+		GUI.msgVerbose += "visitInsertColumns: Getting target columns.\n";
+		for (TerminalNode id: ctx.ID())
+			ids.add(id.getText());
+		GUI.msgVerbose += "visitInsertColumns: Target columns successfully obtained.\n";
+		stack.pop();
+		return ids;
+	}		
+
+	@Override
+	public Object visitSelect(SelectContext ctx) {
+		stack.push("select");
+		// Verify that a database is using.
+		if (GUI.currentDatabase.equals("")){
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in SELECT statement. No database loaded.\n\n";
+			stack.pop();
+			return "error";
+		}
+		
+		String tableName = ctx.ID().getText();
+		currentTables.add(tableName);
+		
+		// Verify that table exist.
+		File tableFile = new File("databases\\"+ GUI.currentDatabase + "\\" + tableName + ".json");
+		if (!tableFile.exists()){
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in SELECT statement. Table '"+ tableName + "' does not exist.\n\n";
+			stack.pop();
+			return "error";	
+		}
+		
+		File masterDatabaseFile = new File("databases\\" + GUI.currentDatabase + "\\masterDatabase.json");
+		String masterDatabase = myTools.readFile(masterDatabaseFile);
+		JSONObject jsonMasterDatabase;
+		JSONArray jsonTables;
+		JSONArray jsonColumns = null;
+		try {
+			jsonMasterDatabase = new JSONObject(masterDatabase);
+			jsonTables = jsonMasterDatabase.getJSONArray("tables");
+			
+			JSONArray jsonPK = null, jsonFKs = null, jsonChecks = null;			
+			GUI.msgVerbose += "Searching table in master database.\n";
+			for (int i=0; i<jsonTables.length(); i++){
+				JSONObject jsonTable = jsonTables.getJSONObject(i);
+				if (jsonTable.getString("name").equals(tableName)){
+					jsonColumns = jsonTable.getJSONArray("columns");				
+					for (int j=0; j<jsonColumns.length(); j++){
+						JSONObject jsonColumn = jsonColumns.getJSONObject(j);
+						currentColumns.add(new Expression(jsonColumn.getString("name"), jsonColumn.getString("type")));
+					}					
+					
+					jsonPK = jsonTable.getJSONObject("constraints").getJSONArray("pks");
+					jsonFKs = jsonTable.getJSONObject("constraints").getJSONArray("fks");
+					jsonChecks = jsonTable.getJSONObject("constraints").getJSONArray("checks");
+					GUI.msgVerbose += "\tTable found.\n";
+					break;
+				}
+			}
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in ALTER TABLE DROP COLUMN statement. A json instruction was not completed.\n\n";
+			stack.pop();
+			return null;
+		}
+		
+		// If table exist, load master database.
+		String data = myTools.readFile(tableFile);
+		JSONObject jsonTable;
+		JSONArray jsonData;
+		JSONArray jsonResult = new JSONArray();
+		try {			
+			// TODO Auto-generated method stub
+			
+			jsonTable = new JSONObject(data);
+			jsonData = jsonTable.getJSONArray("data");
+			
+			ArrayList<Integer> columnsToShow = (ArrayList<Integer>)visit(ctx.selectColumns());				
+			if (columnsToShow == null){
+				GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in SELECT statement. An unexpected error occurred.\n\n";
+				stack.pop();
+				return "error";	
+			}
+			
+			
+			JSONArray jsonTupla, jsonTuplaToShow = null;
+			if (ctx.getChildCount() == 4){
+				for (int i=0; i<jsonData.length(); i++){
+					jsonTupla = jsonData.getJSONArray(i);
+					jsonTuplaToShow = new JSONArray();
+					for (Integer index: columnsToShow){
+						jsonTuplaToShow.put(jsonTupla.get(index));
+					}
+					jsonResult.put(jsonTuplaToShow);
+				}
+			}
+			else{
+				for (int i=0; i<jsonData.length(); i++){
+					jsonTupla = jsonData.getJSONArray(i);
+					jsonTuplaToShow = new JSONArray();
+					for (Integer index: columnsToShow){
+						jsonTuplaToShow.put(jsonTupla.get(index));
+					}
+					
+					
+					Expression condition = (Expression)visit(ctx.expression()); 
+					if (condition == null){
+						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in DELETE statement. Unexpected error in conditional expression.\n\n";
+						stack.pop();
+						return "error";	
+					}					
+					if (!condition.getType().equals("boolean")){
+						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in DELETE statement. The WHERE statement requires a Boolean expression.\n\n";
+						stack.pop();
+						return "error";							
+					}
+					
+					JSONObject jsonColumn;
+					Object[] checkElements = myTools.getColumns(condition.getExpression());
+					String checkCleaned = (String)checkElements[0];				
+					ArrayList<String> checkIDs = (ArrayList<String>)checkElements[1];				
+					Object checkResult;
+					
+								
+					
+					String checkAux = checkCleaned;
+					System.out.println("check original: " + checkAux);
+					
+					ScriptEngineManager manager = new ScriptEngineManager();
+				    ScriptEngine engine = manager.getEngineByName("js");			    			
+					
+					for (int j=0; j<jsonColumns.length(); j++){
+						jsonColumn = jsonColumns.getJSONObject(j);
+						if (checkIDs.contains(jsonColumn.getString("name"))){
+							// If there is a null value, don't delete...
+							if (jsonTuplaToShow.getString(j).equals("")){
+								continue;
+							}
+							if (jsonColumn.getString("type").equals("date") || jsonColumn.getString("type").contains("char"))
+								checkAux = checkAux.replace(jsonColumn.getString("name"), "'" + jsonTuplaToShow.getString(j) + "'");
+							else if (jsonColumn.getString("type").equals("int"))
+								checkAux = checkAux.replace(jsonColumn.getString("name"), jsonTuplaToShow.getString(j));
+						}
+					}
+					
+					try {
+						checkResult = engine.eval(checkAux);
+						if (checkResult.toString().equals("true")){
+							jsonResult.put(jsonTuplaToShow);
+						}
+					} catch (ScriptException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in DELETE statement. Error when trying to evaluate a check.\n\n";
+						stack.pop();
+						return null;
+					}
+					
+					
+				}
+				
+			}
+				
+			ArrayList<String>[][] dataToShow = new ArrayList[jsonResult.length()][jsonTuplaToShow.length()];
+			for (int i=0; i<jsonResult.length(); i++){
+				for (int j=0; j<jsonTuplaToShow.length(); j++){
+					dataToShow[i][j] = new ArrayList();
+					dataToShow[i][j].add(jsonResult.getJSONArray(i).getString(j));
+				}
+			}
+			
+			
+			
+			myTools.showTable(null, null, dataToShow);
+			
+
+			String resultView = myTools.convertSelectResultToContentJsonView(jsonResult);
+			GUI.msgConfirm += "SELECT query returned successfully. \n\nResult of the query: " + jsonResult.length() + " records were found.\n\n" + resultView;
+			stack.pop();
+			return "void";
+
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in SELECT statement. A json instruction was not completed.\n\n";
+			stack.pop();
+			return "error";
+		}
+		
+	}
+	
+	@Override
+	public Object visitSelectColumns(SelectColumnsContext ctx) {
+		stack.push("selectColumns");
+		
+		String tableName = currentTables.get(0);	
+		
+		// If table exist, load master database.
+		File masterDatabaseFile = new File("databases\\" + GUI.currentDatabase + "\\masterDatabase.json");
+		String data = myTools.readFile(masterDatabaseFile);
+		JSONObject jsonMasterDatabase;
+		JSONArray jsonTables;
+		JSONArray jsonColumns = null;
+		try {
+			jsonMasterDatabase = new JSONObject(data);
+			jsonTables = jsonMasterDatabase.getJSONArray("tables");			
+			for (int i=0; i<jsonTables.length(); i++){
+				JSONObject jsonTable = jsonTables.getJSONObject(i);				
+				if (jsonTable.getString("name").equals(tableName)){
+					jsonColumns = jsonTable.getJSONArray("columns");
+				}
+			}
+		
+			ArrayList<Integer> columns = new ArrayList<Integer>();
+			
+			if (ctx.getChild(0).getText().equals("*")){
+				for (int i=0; i<jsonColumns.length(); i++)
+					columns.add(i);
+			}
+			else{
+				ArrayList<String> ids = (ArrayList<String>)visit(ctx.setIDs());
+				for (int i=0; i<jsonColumns.length(); i++){
+					JSONObject column = jsonColumns.getJSONObject(i);
+					if (ids.contains(column.get("name"))){
+						columns.add(i);
+					}
+				}
+			}
+			
+			stack.pop();
+			return columns;
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in SELECT statement. A json instruction was not completed.\n\n";
+			stack.pop();
+			return null;
+		}
+	}
+
+	@Override
+	public Object visitDelete(DeleteContext ctx) {
+		stack.push("delete");
+		currentColumns.clear();
+		// Verify that a database is using.
+		if (GUI.currentDatabase.equals("")){
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in DELETE statement. No database loaded.\n\n";
+			stack.pop();
+			return "error";
+		}
+		
+		String tableName = ctx.ID().getText();
+		currentTables.add(tableName);
+		
+		// Verify that table exist.
+		File tableFile = new File("databases\\"+ GUI.currentDatabase + "\\" + tableName + ".json");
+		if (!tableFile.exists()){
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in DELETE statement. Table '"+ tableName + "' does not exist.\n\n";
+			stack.pop();
+			return "error";	
+		}
+		
+		
+		// If table exist, verify if it is referenced by any table.				
+		
+		File masterDatabaseFile = new File("databases\\" + GUI.currentDatabase + "\\masterDatabase.json");
+		String masterDatabase = myTools.readFile(masterDatabaseFile);
+		JSONObject jsonMasterDatabase;
+		JSONArray jsonTables = null, jsonColumns = null;
+		JSONObject jsonTable = null;
+		try {
+			jsonMasterDatabase = new JSONObject(masterDatabase);
+			jsonTables = jsonMasterDatabase.getJSONArray("tables");
+			
+			// ************************** PENDIENTE YA QUE NO SE HACE ASI **************************
+			// Seraching tablas that make reference to this table...
+			for (int i=0; i<jsonTables.length(); i++){
+				jsonTable = jsonTables.getJSONObject(i);
+				if (jsonTable.getString("name").equals(tableName)){
+					// Obtain table columns...
+					jsonColumns = jsonTable.getJSONArray("columns");
+					for (int j=0; j<jsonColumns.length(); j++){
+						JSONObject jsonColumn = jsonColumns.getJSONObject(j);
+						currentColumns.add(new Expression(jsonColumn.getString("name"), jsonColumn.getString("type")));
+					}
+					
+					
+					JSONObject jsonConstraints = jsonTable.getJSONObject("constraints");
+					JSONArray jsonFKs = jsonConstraints.getJSONArray("fks");
+					for (int j=0; j<jsonFKs.length(); j++){
+						JSONObject jsonFK = jsonFKs.getJSONObject(j);
+						String tableRef = jsonFK.getString("tableRef");
+						if (tableRef.equals(tableName)){
+							GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in DELETE statement. The table '" + tableName + "' is referenced for a FOREIGN KEY in table '" + jsonTable.getString("name") + "'.\n\n";
+							stack.pop();
+							return "error";	
+						}
+					}
+					break;
+				}
+			}		
+		
+			// If table exist, load master database.		
+			String dataTable = myTools.readFile(tableFile);
+			JSONObject jsonDataTable = new JSONObject(dataTable);
+								
+			// DELETE without WHERE
+			if (ctx.getChildCount() == 3){
+				
+				int rows = jsonDataTable.getJSONArray("data").length();
+				jsonDataTable.remove("data");
+				
+				JSONArray jsonData = new JSONArray();
+				jsonDataTable.put("data", jsonData);
+				
+				// Modify number of registers in this table in master database.
+				jsonTable.put("numRegisters", 0);
+				
+				// Rewriting masterDatabases...
+				myTools.writeFile(masterDatabaseFile, jsonMasterDatabase.toString());	
+				
+				// Rewriting data table...
+				myTools.writeFile(tableFile, jsonDataTable.toString());
+				GUI.msgConfirm += "DELETE query returned successfully. " + rows + " rows affected.\n\n";				
+				stack.pop();
+				return "void";
+				
+			}
+			else{
+				
+				Expression condition = (Expression)visit(ctx.expression()); 
+				if (condition == null){
+					GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in DELETE statement. Unexpected error in conditional expression.\n\n";
+					stack.pop();
+					return "error";	
+				}					
+				if (!condition.getType().equals("boolean")){
+					GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in DELETE statement. The WHERE statement requires a Boolean expression.\n\n";
+					stack.pop();
+					return "error";							
+				}
+				
+				JSONObject jsonColumn;
+				Object[] checkElements = myTools.getColumns(condition.getExpression());
+				String checkCleaned = (String)checkElements[0];				
+				ArrayList<String> checkIDs = (ArrayList<String>)checkElements[1];				
+				Object checkResult;
+				
+				int rows = 0;
+				JSONArray jsonData = jsonDataTable.getJSONArray("data");				
+				JSONArray jsonRow;
+				
+				for (int i=0; i<jsonData.length(); i++){
+					jsonRow = jsonData.getJSONArray(i);
+					String checkAux = checkCleaned;
+					System.out.println("check original: " + checkAux);
+					
+					ScriptEngineManager manager = new ScriptEngineManager();
+				    ScriptEngine engine = manager.getEngineByName("js");			    			
+					
+					for (int j=0; j<jsonColumns.length(); j++){
+						jsonColumn = jsonColumns.getJSONObject(j);
+						if (checkIDs.contains(jsonColumn.getString("name"))){
+							// If there is a null value, don't delete...
+							if (jsonRow.getString(j).equals("")){
+								continue;
+							}							
+							if (jsonColumn.getString("type").equals("date") || jsonColumn.getString("type").contains("char"))
+								checkAux = checkAux.replace(jsonColumn.getString("name"), "'" + jsonRow.getString(j) + "'");
+							else if (jsonColumn.getString("type").equals("int"))
+								checkAux = checkAux.replace(jsonColumn.getString("name"), jsonRow.getString(j));
+						}
+					}
+					
+					try {
+						checkResult = engine.eval(checkAux);
+						if (checkResult.toString().equals("true")){
+							rows++;
+							jsonData.remove(i);
+							i--;
+						}
+					} catch (ScriptException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+						GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in DELETE statement. Error when trying to evaluate a check.\n\n";
+						stack.pop();
+						return null;
+					}
+				}
+
+				
+				// Modify number of registers in this table in master database.
+				for (int i=0; i<jsonTables.length(); i++){
+					JSONObject jsonTableAux = jsonTables.getJSONObject(i);
+					if (jsonTableAux.getString("name").equals(tableName)){
+						jsonTableAux.put("numRegisters", jsonData.length());
+					}
+				}
+				
+				// Rewriting masterDatabase...
+				myTools.writeFile(masterDatabaseFile, jsonMasterDatabase.toString());	
+				
+				// Rewriting data table...
+				myTools.writeFile(tableFile, jsonDataTable.toString());
+				GUI.msgConfirm += "DELETE query returned successfully. " + rows + " rows affected.\n\n";				
+				stack.pop();
+				currentTables.clear();
+				return "void";
+			}
+			
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			GUI.msgError += "ERROR [" + ctx.start.getLine() + " : " + ctx.start.getCharPositionInLine() +"] Stack : " + stack.toString() + " Exception in DELETE statement. A json instruction was not completed.\n\n";
+			stack.pop();
+			return "error";
+		}
+	}
+
+
+
 	
 	private Expression existInCurrentColumns(String id){
 		for (Expression id2: currentColumns){
@@ -1465,6 +2519,7 @@ public class Visitor extends SQLBaseVisitor<Object> {
 				count++;
 		}
 		return count;
-	}
+	}	
+	
 
 }

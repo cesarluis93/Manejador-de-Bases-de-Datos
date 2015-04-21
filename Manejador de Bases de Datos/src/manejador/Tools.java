@@ -1,5 +1,7 @@
 package manejador;
 
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -13,6 +15,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+
+import javax.swing.JFrame;
+import javax.swing.JOptionPane;
+import javax.swing.JTable;
+import javax.swing.table.DefaultTableModel;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -96,6 +103,21 @@ public class Tools {
 		return toshow;
 	}
 	
+	public String convertSelectResultToContentJsonView(JSONArray data){
+		String toshow = "";
+		for (int i=0; i<data.length(); i++){
+			try {
+				toshow += String.valueOf(i+1) + " : " + data.getJSONArray(i).toString() + "\n";
+			} catch (JSONException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+			
+		return toshow;
+	}
+	
+	
 	/**
 	 * Elimina un directorio y su contenido.
 	 * @param directory - Directorio a eliminar.
@@ -127,7 +149,7 @@ public class Tools {
 		}
 	    
     }
-    
+        
     
     /**
      * Verifica si un JSONArray de Strings contiene un String determinado.
@@ -186,7 +208,7 @@ public class Tools {
      * @param expression
      * @return Object[] - array con la expressión limpiada y Arraylist de los ids.
      */
-    public Object[] getColumns(String expression){		
+    public Object[] getColumns(String expression){
 		String newExpression = "";
 		ArrayList<String> columns = new ArrayList();
 		char prev = ' ';		 
@@ -209,5 +231,68 @@ public class Tools {
 		return result;
     }
     
+    /**
+     * Muestra una ventana con una tabla. Cuando se cierre la tabla, el Programa se termina automaticamente.
+     * @param rowLabels Etiquetas para las filas.
+     * @param columnLabels Etiquetas para las columnas.
+     * @param data Matriz de datos para la tabla.
+     */
+    public void showTable(ArrayList<String> rowLabels, ArrayList<String> columnLabels, ArrayList<String>[][] data){        
+        
+        //Modificacion del numero de filas y columnas cuando estas poseen etiquetas.
+        int rows = data.length, columns = data[0].length;
+        rows = (columnLabels != null)? (rows + 1): rows;
+        columns = (rowLabels != null)? (columns + 1): columns;
+        //Creacion del modelo de datos para la tabla.
+        DefaultTableModel modelo = new DefaultTableModel(rows,columns);
+        JTable tabla = new JTable (modelo);        
+        
+        //Si las columnas tienen etiquetas, llenarlas.
+        if (columnLabels != null){
+            int index = (rowLabels != null)? 0: -1;
+            for (String str: columnLabels){
+                index++;                
+                modelo.setValueAt(str, 0, index);
+            }
+        }
+        //Si las filas tienen etiquetas, llenarlas.
+        if (rowLabels != null){            
+            int index = (columnLabels != null)? 0: -1;
+            for (String str: rowLabels){
+                index++;
+                modelo.setValueAt(str, index, 0);
+            }
+        }
+        
+        //tabla.setRowHeight(50); //Modificar la altura de la tabla.
+        
+        //Obtencion de los datos para la tabla
+        String content;
+        int row, column;
+        for (int i = 0; i < data.length; i++) {
+            for (int j = 0; j < data[0].length; j++) {
+                content = "";
+                for (String value: data[i][j])
+                    content += value;
+                row = (columnLabels != null)? (i+1): i;
+                column = (rowLabels != null)? (j+1): j;                
+                modelo.setValueAt(content, row, column);
+            }
+        }
+                
+        
+        //VENTANA PARA MOSTRAR LA TABLA
+        JFrame ventana = new JFrame();
+        //manejamos la salida
+        ventana.addWindowListener(new WindowAdapter() {
+            public void windowClosing(WindowEvent e) {
+                System.exit(0);
+            }
+        });
+        ventana.add(tabla);
+        ventana.pack();
+        ventana.setVisible(true);
+        JOptionPane.showMessageDialog(null, "Doble click en una celda para ver contenido completo..!", "Compiladores", 1);
+    }
     
 }
